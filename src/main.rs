@@ -1,3 +1,7 @@
+mod graph;
+mod draw;
+mod tsp;
+
 fn main() {
-    println!("Hello, world!");
+    draw::draw();
 }
