@@ -6,8 +6,9 @@ use nannou::rand;
 pub type TspPath = Vec<PointId>;
 
 pub struct Tsp {
-    graph:  Rc<Graph>,
+    pub graph:  Rc<Graph>,
     path: TspPath,
+    pub history: Vec<TspPath>
 }
 
 impl Tsp {
@@ -15,6 +16,7 @@ impl Tsp {
         Tsp {
             graph,
             path: Vec::new(),
+            history: Vec::new()
         }
     }
 
@@ -57,7 +59,7 @@ impl Tsp {
         }
     }
 
-    pub fn tsp_2_opt(&mut self) -> Result<(i32, Vec<TspPath>), ()> {
+    pub fn tsp_2_opt(&mut self) -> Result<i32, ()> {
         let mut best_length = self.calculate_path_length();
         let n = self.path.len() as usize;
         let mut improved = true;
@@ -88,7 +90,8 @@ impl Tsp {
             }
         }
 
-        Ok((best_length, history))
+        self.history = history;
+        Ok(best_length)
     }
 }
 
@@ -118,7 +121,7 @@ mod tests {
         let mut tsp = Tsp::new(Rc::clone(&graph));
         tsp.set_starting_path(path);
 
-        let (length, _) = tsp.tsp_2_opt().unwrap();
+        let length = tsp.tsp_2_opt().unwrap();
         assert_eq!(length, 5);
     } 
 }

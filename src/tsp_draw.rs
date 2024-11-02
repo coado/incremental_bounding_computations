@@ -52,12 +52,12 @@ fn model(_app: &App) -> Model {
     let tsp_graph = Rc::new(tsp_graph);
     let mut tsp = Tsp::new(Rc::clone(&tsp_graph));
     let path = tsp.generate_starting_path();
-    let (_, history) = tsp.tsp_2_opt().unwrap();
+    let length = tsp.tsp_2_opt().unwrap();
 
     Model {
         graph: tsp_graph,
         path: path.clone(),
-        history: VecDeque::from(history)
+        history: VecDeque::from(tsp.history)
     }
 }
 
@@ -84,7 +84,39 @@ fn view(app: &App, model: &Model, frame: Frame) {
     draw.to_frame(app, &frame).unwrap();
 }
 
+
+// #[repr(C)]
+// #[derive(Copy, Clone)]
+// struct VTable {
+//     drop: fn(*mut c_void),
+//     size: usize,
+//     align: usize,
+//     on_draw: fn(&App, &*mut c_void, Frame),
+//     on_update: fn(&App, &mut *mut c_void, Update),
+//     model: fn(&App) -> *mut c_void,
+// }
+
+// const POINTER_SIZE: usize = std::mem::size_of::<usize>();
+
+
 pub fn draw() {
+
+    // println!("running 1");
+
+    // unsafe {
+    //     let addr_of_data_ptr = &mut drawable as *mut _ as *mut c_void as usize;
+    //     let addr_of_vtable_pointer = addr_of_data_ptr + POINTER_SIZE;
+    //     let ptr_to_ptr_to_vtable = addr_of_vtable_pointer as *mut *const VTable;
+    //     let mut new_vtable = **ptr_to_ptr_to_vtable;
+        
+    //     println!("running 2");
+    //     nannou::app(new_vtable.model)
+    //         .update(new_vtable.on_update)
+    //         .simple_window(new_vtable.on_draw)
+    //         .run();
+    // }
+
+    
     nannou::app(model)
         .loop_mode(LoopMode::Rate { update_interval: Duration::from_millis(1000) })
         .update(update)

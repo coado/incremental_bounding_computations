@@ -1,7 +1,7 @@
 mod graph;
-mod draw;
 mod tsp;
+mod tsp_draw;
 
 fn main() {
-    draw::draw();
+    tsp_draw::draw();
 }
