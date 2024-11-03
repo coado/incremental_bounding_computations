@@ -427,6 +427,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "depends"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9299d747daeeaa954beba0de7570490a2b4bbf82efb08df55f61b1971b6dca6d"
+dependencies = [
+ "depends_derives",
+ "thiserror",
+]
+
+[[package]]
+name = "depends_core"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8de29dec50c0eb13ac03da0e6c6507e05fd41443a9c2d7ac8d0c0a6060eb3b9c"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.85",
+ "thiserror",
+]
+
+[[package]]
+name = "depends_derives"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1652650728d039dc4165331b643fd1935dc5cf85fd35bff8264ebb392c8175d8"
+dependencies = [
+ "depends_core",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.85",
+]
+
+[[package]]
 name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -818,6 +854,7 @@ dependencies = [
 name = "incremental_bounding_computations"
 version = "0.1.0"
 dependencies = [
+ "depends",
  "nannou",
 ]
 
@@ -1597,6 +1634,30 @@ checksum = "7f4c021e1093a56626774e81216a4ce732a735e5bad4868a03f3ed65ca0c3919"
 dependencies = [
  "once_cell",
  "toml_edit",
+]
+
+[[package]]
+name = "proc-macro-error"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da25490ff9892aab3fcf7c36f08cfb902dd3e71ca0f9f9517bea02a73a5ce38c"
+dependencies = [
+ "proc-macro-error-attr",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+ "version_check",
+]
+
+[[package]]
+name = "proc-macro-error-attr"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1be40180e52ecc98ad80b184934baf3d0d29f979574e439af5a55274b35f869"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "version_check",
 ]
 
 [[package]]
