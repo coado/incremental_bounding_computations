@@ -19,6 +19,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c71b1793ee61086797f5c80b6efa2b8ffa6d5dd703f118545808a7f2e27f7046"
 
 [[package]]
+name = "adapton"
+version = "0.3.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "981c88fc09f4958a2e401bf9022b981781037d88ce8644407da0d9b34f0c9a48"
+
+[[package]]
 name = "addr2line"
 version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -854,6 +860,7 @@ dependencies = [
 name = "incremental_bounding_computations"
 version = "0.1.0"
 dependencies = [
+ "adapton",
  "depends",
  "nannou",
 ]
