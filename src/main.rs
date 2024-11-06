@@ -7,5 +7,5 @@ mod tsp_comp;
 fn main() {
     // tsp_draw::draw();
 
-    tsp_comp::run();
+    // tsp_comp::run();
 }
