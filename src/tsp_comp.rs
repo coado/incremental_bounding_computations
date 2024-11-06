@@ -1,16 +1,20 @@
 use adapton::macros::*;
 use adapton::engine::*;
+use adapton::reflect;
 
-pub struct TspComp<'a> {
-    al: &'a Vec<Vec<i32>>,
+pub struct TspComp {
+    al: &'static Vec<Vec<i32>>,
     input_nodes: Vec<Art<i32>>,
     res: Art<i32>,
-    n: usize
+    n: usize,
+    sealed: bool
 }
 
-impl<'a> TspComp<'a> {
+impl TspComp {
     fn new(al: &'static Vec<Vec<i32>>, n: usize) -> TspComp {
         manage::init_dcg();
+        reflect::dcg_reflect_begin();
+
         let input_nodes = (0..n).map(|_| {
             cell!(0)
         }).collect();
@@ -21,11 +25,13 @@ impl<'a> TspComp<'a> {
             al,
             input_nodes,
             res,
-            n
+            n,
+            sealed: false
         }
     }
 
     pub fn update_input_nodes(&mut self, updates: Vec<(usize, i32)>) {
+        self.ensure_unsealed();
         for (idx, val) in updates {
             set(&self.input_nodes[idx], val);
         }
@@ -33,6 +39,20 @@ impl<'a> TspComp<'a> {
 
     pub fn get_result(&self) -> i32 {
         get!(self.res)
+    }
+
+    pub fn seal(&mut self) {
+        self.ensure_unsealed();
+        self.sealed = true;
+        let traces = reflect::dcg_reflect_end();
+        let counts = reflect::trace::trace_count(&traces, None);
+
+        // TODO: implement better diagnostics 
+        println!("TspComp: traces: {:?}", counts);
+    }
+
+    fn ensure_unsealed(&mut self) {
+        assert!(!self.sealed, "TspComp is sealed");
     }
 
     fn calc_result(input_nodes: &Vec<Art<i32>>, al: &'static Vec<Vec<i32>>) -> Art<i32> {
@@ -46,6 +66,7 @@ impl<'a> TspComp<'a> {
         }).collect::<Vec<Art<i32>>>();
         
         // subsequent layers sum up the edges
+        // TODO: make it better
         while outputs.len() > 1 {
             let mut new_inputs = vec![];
         
@@ -64,7 +85,6 @@ impl<'a> TspComp<'a> {
                 i += 2;
             }
     
-        
             outputs = new_inputs.clone();
         }
 
@@ -101,7 +121,18 @@ mod tests {
         ];
 
         tsp_comp.update_input_nodes(updates);
-        println!("result: {}", tsp_comp.get_result());
-        // assert_eq!(tsp_comp.get_result(), 10);
+        assert_eq!(tsp_comp.get_result(), 24);
+
+        let updates = vec![
+            (0, 0),
+            (1, 1),
+            (2, 2),
+            (3, 3),
+            (4, 4),
+            (5, 0)
+        ];
+        tsp_comp.update_input_nodes(updates);
+        assert_eq!(tsp_comp.get_result(), 5);
+        tsp_comp.seal();
     }
 }
