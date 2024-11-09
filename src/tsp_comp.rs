@@ -3,10 +3,8 @@ use adapton::engine::*;
 use adapton::reflect;
 
 pub struct TspComp {
-    // al: &'static Vec<Vec<i32>>,
     input_nodes: Vec<Art<i32>>,
     res: Art<i32>,
-    // n: usize,
     sealed: bool
 }
 
@@ -19,15 +17,11 @@ impl TspComp {
             cell!(0)
         }).collect();
 
-        println!("tsp_comp al rows: {}, al cols: {}", al.len(), al[0].len());
-
-        let res = TspComp::calc_result(&input_nodes, al);
+        let res = TspComp::create_computation_graph(&input_nodes, al);
         
         TspComp {
-            // al,
             input_nodes,
             res,
-            // n,
             sealed: false
         }
     }
@@ -38,9 +32,6 @@ impl TspComp {
         for (idx, val) in updates {
             set(&self.input_nodes[idx], val);
         }
-
-        let values = self.input_nodes.iter().map(|node| get!(node)).collect::<Vec<i32>>();
-        println!("TspComp input nodes: {:?}", values);
     }
 
     pub fn get_result(&self) -> i32 {
@@ -52,16 +43,17 @@ impl TspComp {
         self.sealed = true;
         let traces = reflect::dcg_reflect_end();
         let counts = reflect::trace::trace_count(&traces, None);
-
+        
         // TODO: implement better diagnostics 
-        println!("TspComp: traces: {:?}", counts);
+        // println!("TspComp: traces: {:?}", counts);
+        // println!("Traces: {:?}", traces);
     }
 
     fn ensure_unsealed(&mut self) {
         assert!(!self.sealed, "TspComp is sealed");
     }
 
-    fn calc_result(input_nodes: &Vec<Art<i32>>, al: &'static Vec<Vec<i32>>) -> Art<i32> {
+    fn create_computation_graph(input_nodes: &Vec<Art<i32>>, al: &'static Vec<Vec<i32>>) -> Art<i32> {
         // first layer contains the input nodes, which are the indices of the nodes in the adjacency list
         // second layer retrieves edges from adjacency list
         let mut outputs = input_nodes.windows(2).map(|chunk| {
@@ -71,10 +63,10 @@ impl TspComp {
         }).collect::<Vec<Art<i32>>>();
 
         // last and first vertex
-        let a = input_nodes[input_nodes.len() - 1].clone();
-        let b = input_nodes[0].clone();
-        let c = thunk!(al[get!(a) as usize][get!(b) as usize]);
-        outputs.push(c);
+        let last = input_nodes[input_nodes.len() - 1].clone();
+        let first = input_nodes[0].clone();
+        let closing_connection = thunk!(al[get!(last) as usize][get!(first) as usize]);
+        outputs.push(closing_connection);
         
         // subsequent layers sum up the edges
         // TODO: make it better

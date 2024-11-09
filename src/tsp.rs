@@ -21,8 +21,6 @@ impl Tsp {
             true => {
                 let al = graph.get_raw_adjacency_list();
                 let static_al: &'static mut Vec<Vec<i32>> = Box::leak(Box::new(al));
-                println!("al list: {:?}", static_al);
-                println!("Created computation graph, static al: {}", static_al.len());
                 Some(TspComp::new(static_al, number_of_nodes))
             },
             false => None
@@ -99,6 +97,12 @@ impl Tsp {
         }
     }
 
+    fn finish(&mut self) {
+        if let Some(comp_graph) = &mut self.computation_graph {
+            comp_graph.seal();
+        }
+    }
+
     pub fn tsp_2_opt(&mut self) -> Result<i32, ()> {
         let mut best_length = self.calculate_path_length();
         let n = self.path.len() as usize;
@@ -141,6 +145,7 @@ impl Tsp {
             }
         }
 
+        self.finish();
         self.history = history;
         Ok(best_length)
     }

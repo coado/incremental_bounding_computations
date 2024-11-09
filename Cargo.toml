@@ -7,5 +7,15 @@ edition = "2021"
 
 [dependencies]
 adapton = "0.3.31"
+criterion = "0.5.1"
 depends = "0.10.2"
 nannou = "0.19"
+
+[lib]
+name = "incremental_computations"
+path = "src/lib.rs"
+
+[[bench]]
+name = "benchmark"
+harness = false
+

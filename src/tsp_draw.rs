@@ -46,7 +46,7 @@ fn draw_path(draw: &Draw, boundary: &Rect, path: TspPath, model: &Model) {
 
 fn model(_app: &App) -> Model {
     let mut tsp_graph = Graph::new();
-    tsp_graph.fill_with_random_points(10);
+    tsp_graph.fill_with_random_points(100);
     tsp_graph.fill_with_edges();
 
     let tsp_graph = Rc::new(tsp_graph);
