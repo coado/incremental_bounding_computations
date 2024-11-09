@@ -14,8 +14,8 @@ struct Model {
 }
 
 fn draw_vertices(draw: &Draw, boundary: &Rect, model: &Model) {
-    let nodes: &Vec<Point> = &model.graph.nodes;
-    let graph_boundary = &model.graph.boundary;
+    let nodes: &Vec<Point> = model.graph.get_nodes();
+    let graph_boundary = model.graph.get_boundary();
 
     for node in nodes {
         let x = map_range(node.x, graph_boundary.2, graph_boundary.3, boundary.left(), boundary.right());
@@ -25,8 +25,8 @@ fn draw_vertices(draw: &Draw, boundary: &Rect, model: &Model) {
 }
 
 fn draw_path(draw: &Draw, boundary: &Rect, path: TspPath, model: &Model) {
-    let nodes = &model.graph.nodes;
-    let graph_boundary = &model.graph.boundary;
+    let nodes = model.graph.get_nodes();
+    let graph_boundary = model.graph.get_boundary();
 
     let n = path.len();
     for i in 0..n {
@@ -46,18 +46,18 @@ fn draw_path(draw: &Draw, boundary: &Rect, path: TspPath, model: &Model) {
 
 fn model(_app: &App) -> Model {
     let mut tsp_graph = Graph::new();
-    tsp_graph.fill_with_random_points(1000);
+    tsp_graph.fill_with_random_points(10);
     tsp_graph.fill_with_edges();
 
     let tsp_graph = Rc::new(tsp_graph);
-    let mut tsp = Tsp::new(Rc::clone(&tsp_graph));
+    let mut tsp = Tsp::new(Rc::clone(&tsp_graph), true);
     let path = tsp.generate_starting_path();
     let length = tsp.tsp_2_opt().unwrap();
 
     Model {
         graph: tsp_graph,
         path: path.clone(),
-        history: VecDeque::from(tsp.history)
+        history: VecDeque::from(tsp.get_history().clone())
     }
 }
 

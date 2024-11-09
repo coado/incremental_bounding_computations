@@ -31,10 +31,10 @@ pub struct Edge {
 
 #[derive(Debug, Default)]
 pub struct Graph {
-    pub nodes: Vec<Point>,
-    pub edges: Vec<Edge>,
-    pub adj_list: Vec<Vec<EdgeId>>,
-    pub boundary: (Top, Bottom, Left, Right),
+    nodes: Vec<Point>,
+    edges: Vec<Edge>,
+    adj_list: Vec<Vec<EdgeId>>,
+    boundary: (Top, Bottom, Left, Right),
     edges_lookup: HashMap<(PointId, PointId), EdgeId>,
 }
 
@@ -100,6 +100,26 @@ impl Graph {
                 self.add_edge(u as i32, v as i32, weight);
             }
         }
+    }
+
+    pub fn get_number_of_nodes(&self) -> usize {
+        self.nodes.len()
+    }
+
+    pub fn get_raw_adjacency_list(&self) -> Vec<Vec<i32>> {
+        self.adj_list.iter().enumerate().map(|(i, edges)| {
+            let mut res = edges.iter().map(|&id| self.edges[id as usize].weight).collect::<Vec<i32>>();
+            res.insert(i, 0);
+            res
+        }).collect()
+    }
+
+    pub fn get_nodes(&self) -> &Vec<Point> {
+        &self.nodes
+    }
+
+    pub fn get_boundary(&self) -> (Top, Bottom, Left, Right) {
+        self.boundary
     }
 }
 

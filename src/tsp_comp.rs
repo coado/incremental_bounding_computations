@@ -3,15 +3,15 @@ use adapton::engine::*;
 use adapton::reflect;
 
 pub struct TspComp {
-    al: &'static Vec<Vec<i32>>,
+    // al: &'static Vec<Vec<i32>>,
     input_nodes: Vec<Art<i32>>,
     res: Art<i32>,
-    n: usize,
+    // n: usize,
     sealed: bool
 }
 
 impl TspComp {
-    fn new(al: &'static Vec<Vec<i32>>, n: usize) -> TspComp {
+    pub fn new(al: &'static Vec<Vec<i32>>, n: usize) -> TspComp {
         manage::init_dcg();
         reflect::dcg_reflect_begin();
 
@@ -19,13 +19,15 @@ impl TspComp {
             cell!(0)
         }).collect();
 
+        println!("tsp_comp al rows: {}, al cols: {}", al.len(), al[0].len());
+
         let res = TspComp::calc_result(&input_nodes, al);
         
         TspComp {
-            al,
+            // al,
             input_nodes,
             res,
-            n,
+            // n,
             sealed: false
         }
     }
@@ -61,9 +63,14 @@ impl TspComp {
         let mut outputs = input_nodes.windows(2).map(|chunk| {
             let a = chunk[0].clone();
             let b = chunk[1].clone();
-            let c = thunk!(al[get!(a) as usize][get!(b) as usize]);
-            c
+            thunk!(al[get!(a) as usize][get!(b) as usize])
         }).collect::<Vec<Art<i32>>>();
+
+        // last and first vertex
+        let a = input_nodes[input_nodes.len() - 1].clone();
+        let b = input_nodes[0].clone();
+        let c = thunk!(al[get!(a) as usize][get!(b) as usize]);
+        outputs.push(c);
         
         // subsequent layers sum up the edges
         // TODO: make it better
