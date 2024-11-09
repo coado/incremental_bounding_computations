@@ -33,10 +33,14 @@ impl TspComp {
     }
 
     pub fn update_input_nodes(&mut self, updates: Vec<(usize, i32)>) {
+        // println!("tsp_comp update_input_nodes: {:?}", updates);
         self.ensure_unsealed();
         for (idx, val) in updates {
             set(&self.input_nodes[idx], val);
         }
+
+        let values = self.input_nodes.iter().map(|node| get!(node)).collect::<Vec<i32>>();
+        println!("TspComp input nodes: {:?}", values);
     }
 
     pub fn get_result(&self) -> i32 {
