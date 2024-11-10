@@ -114,32 +114,33 @@ impl Tsp {
             improved = false;
             for i in 0..n-1 {
                 for j in i+2..n {
+
+                    let e1 = self.graph.get_edge_from_lookup(self.path[i], self.path[i+1]).unwrap().weight;
+                    let e2 = self.graph.get_edge_from_lookup(self.path[j], self.path[(j+1)%n]).unwrap().weight;
+                    let ne1 = self.graph.get_edge_from_lookup(self.path[i], self.path[j]).unwrap().weight;
+                    let ne2 = self.graph.get_edge_from_lookup(self.path[i+1], self.path[(j+1)%n]).unwrap().weight;
                     
-                    self.swap_edges(i, j);
-                    let new_length = self.calculate_path_length();
+                    let delta = (ne1 + ne2) - (e1 + e2);
 
-                    if new_length < best_length {
-                        best_length = new_length;
-                        improved = true;
-                        history.push(self.path.clone());
-                    } else {
-                        // reverse
-                        self.swap_edges(i, j);
-                    }
-
-                    // let e1 = self.graph.get_edge_from_lookup(self.path[i], self.path[i+1]).unwrap().weight;
-                    // let e2 = self.graph.get_edge_from_lookup(self.path[j], self.path[(j+1)%n]).unwrap().weight;
-                    // let ne1 = self.graph.get_edge_from_lookup(self.path[i], self.path[j]).unwrap().weight;
-                    // let ne2 = self.graph.get_edge_from_lookup(self.path[i+1], self.path[(j+1)%n]).unwrap().weight;
                     
-                    // let delta = (ne1 + ne2) - (e1 + e2);
+                    // self.swap_edges(i, j);
+                    // let new_length = self.calculate_path_length();
 
-                    // if delta < 0 {
-                    //     self.swap_edges(i, j);
+                    // if new_length < best_length {
+                    //     best_length = new_length;
                     //     improved = true;
-                    //     best_length += delta;
                     //     history.push(self.path.clone());
+                    // } else {
+                    //     // reverse
+                    //     self.swap_edges(i, j);
                     // }
+
+                    if delta < 0 {
+                        self.swap_edges(i, j);
+                        improved = true;
+                        best_length = self.calculate_path_length();
+                        history.push(self.path.clone());
+                    }
 
                 }
             }
