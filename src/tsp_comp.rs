@@ -56,42 +56,59 @@ impl TspComp {
     fn create_computation_graph(input_nodes: &Vec<Art<i32>>, al: &'static Vec<Vec<i32>>) -> Art<i32> {
         // first layer contains the input nodes, which are the indices of the nodes in the adjacency list
         // second layer retrieves edges from adjacency list
-        let mut outputs = input_nodes.windows(2).map(|chunk| {
-            let a = chunk[0].clone();
-            let b = chunk[1].clone();
-            thunk!(al[get!(a) as usize][get!(b) as usize])
-        }).collect::<Vec<Art<i32>>>();
+        // let mut outputs = input_nodes.windows(2).map(|chunk| {
+        //     let a = chunk[0].clone();
+        //     let b = chunk[1].clone();
+        //     thunk!(al[get!(a) as usize][get!(b) as usize])
+        // }).collect::<Vec<Art<i32>>>();
 
         // last and first vertex
-        let last = input_nodes[input_nodes.len() - 1].clone();
-        let first = input_nodes[0].clone();
-        let closing_connection = thunk!(al[get!(last) as usize][get!(first) as usize]);
-        outputs.push(closing_connection);
+        // let last = input_nodes[input_nodes.len() - 1].clone();
+        // let first: Art<i32> = input_nodes[0].clone();
+        // let closing_connection = thunk!(al[get!(last) as usize][get!(first) as usize]);
+        // outputs.push(closing_connection);
+
+        // fn devide_and_conquer(nodes: &Vec<Art<i32>>, left: usize, right: usize) -> Art<i32> {
+        //     if left == right {
+        //         return nodes[left].clone();
+        //     }
+    
+        //     let mid = left + (right - left) / 2;
+        //     let left_res = devide_and_conquer(nodes, left, mid);
+        //     let right_res = devide_and_conquer(nodes, mid + 1, right);
+    
+        //     thunk!(get!(left_res) + get!(right_res))
+        // }
         
         // subsequent layers sum up the edges
         // TODO: make it better
-        while outputs.len() > 1 {
-            let mut new_inputs = vec![];
-        
-            if outputs.len() % 2 == 1 {
-                outputs.push(cell!(0));
-            }
+        // while outputs.len() > 1 {
+        //     let mut new_outputs = Vec::with_capacity((outputs.len() + 1) / 2);
+            
+        //     let mut i = 0;
+        //     while i < outputs.len() {
+        //         if i + 1 < outputs.len() {
+        //             let a = outputs[i].clone();
+        //             let b = outputs[i + 1].clone();
+        //             new_outputs.push(thunk!(get!(a) + get!(b)));
+        //         } else {
+        //             new_outputs.push(outputs[i].clone());
+        //         }
+        //         i += 2;
+        //     }
     
-            let mut i = 1;
-            while i < outputs.len() {
-                let a = outputs[i - 1].clone();
-                let b = outputs[i].clone();
-                
-                let c = thunk!(get!(a) + get!(b));
-                new_inputs.push(c.clone());
-    
-                i += 2;
-            }
-    
-            outputs = new_inputs.clone();
-        }
+        //     outputs = new_outputs;
+        // }
 
-        outputs[0].clone()
+        // outputs[0].clone()
+
+        // devide_and_conquer(input_nodes, 0, input_nodes.len() - 1)
+        let nodes = input_nodes.clone();
+        let sum_thunk = thunk!({
+            nodes.iter().fold(0, |acc, el| acc + get!(el))
+        });
+        sum_thunk
+        
     }
 }
 
@@ -101,7 +118,7 @@ mod tests {
 
     #[test]
     fn test() {
-        let size = 6;
+        let size = 5;
         let al = Box::new(vec![
             vec![0, 1, 7, 6, 1],
             vec![1, 0, 1, 4, 9],
@@ -120,7 +137,6 @@ mod tests {
             (2, 0),
             (3, 2),
             (4, 1),
-            (5, 4)
         ];
 
         tsp_comp.update_input_nodes(updates);
@@ -132,7 +148,6 @@ mod tests {
             (2, 2),
             (3, 3),
             (4, 4),
-            (5, 0)
         ];
         tsp_comp.update_input_nodes(updates);
         assert_eq!(tsp_comp.get_result(), 5);

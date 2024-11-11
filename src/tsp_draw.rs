@@ -84,39 +84,7 @@ fn view(app: &App, model: &Model, frame: Frame) {
     draw.to_frame(app, &frame).unwrap();
 }
 
-
-// #[repr(C)]
-// #[derive(Copy, Clone)]
-// struct VTable {
-//     drop: fn(*mut c_void),
-//     size: usize,
-//     align: usize,
-//     on_draw: fn(&App, &*mut c_void, Frame),
-//     on_update: fn(&App, &mut *mut c_void, Update),
-//     model: fn(&App) -> *mut c_void,
-// }
-
-// const POINTER_SIZE: usize = std::mem::size_of::<usize>();
-
-
-pub fn draw() {
-
-    // println!("running 1");
-
-    // unsafe {
-    //     let addr_of_data_ptr = &mut drawable as *mut _ as *mut c_void as usize;
-    //     let addr_of_vtable_pointer = addr_of_data_ptr + POINTER_SIZE;
-    //     let ptr_to_ptr_to_vtable = addr_of_vtable_pointer as *mut *const VTable;
-    //     let mut new_vtable = **ptr_to_ptr_to_vtable;
-        
-    //     println!("running 2");
-    //     nannou::app(new_vtable.model)
-    //         .update(new_vtable.on_update)
-    //         .simple_window(new_vtable.on_draw)
-    //         .run();
-    // }
-
-    
+pub fn draw() {    
     nannou::app(model)
         .loop_mode(LoopMode::Rate { update_interval: Duration::from_millis(1000) })
         .update(update)
