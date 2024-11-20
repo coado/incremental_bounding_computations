@@ -4,7 +4,7 @@ use std::collections::HashMap;
 pub const EPS: f64 = 1e-9;
 
 pub type PointId = i32;
-type EdgeId = i32;
+pub type EdgeId = i32;
 type Top = f64;
 type Bottom = f64;
 type Left = f64;

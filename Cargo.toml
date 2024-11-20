@@ -16,6 +16,9 @@ name = "incremental_computations"
 path = "src/lib.rs"
 
 [[bench]]
-name = "benchmark"
+name = "adapton_benchmark"
 harness = false
 
+[[bench]]
+name = "benchmark"
+harness = false
