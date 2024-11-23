@@ -4,5 +4,9 @@ mod tsp;
 mod tsp_draw;
 mod tsp_comp;
 mod graph_coloring;
+mod graph_coloring_draw;
 
-fn main() {}
+fn main() {
+    // graph_coloring_draw::draw();
+    tsp_draw::draw();
+}

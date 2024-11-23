@@ -20,6 +20,10 @@ impl Point {
     fn new(x: f64, y: f64) -> Point {
         Point { x, y }
     }
+
+    fn distance(&self, other: &Point) -> f64 {
+        ((self.x - other.x).powi(2) + (self.y - other.y).powi(2)).sqrt()
+    }
 }
 
 #[derive(Debug)]
@@ -72,6 +76,19 @@ impl Graph {
         }
     }
 
+    pub fn get_adjacent_nodes(&self, u: PointId) -> Vec<PointId> {
+        self.adj_list[u as usize]
+            .iter()
+            .map(|&id| {
+                let edge = &self.edges[id as usize];
+                match edge.p1 == u {
+                    true => edge.p2,
+                    false => edge.p1,
+                }
+            })
+            .collect()
+    }
+
 
     pub fn get_edge_from_lookup(&self, u: PointId, v: PointId) -> Option<&Edge> {
         let key = (u.min(v), u.max(v));
@@ -89,15 +106,31 @@ impl Graph {
         }
     }
 
-    pub fn fill_with_edges(&mut self) {
+    pub fn fill_with_edges_full(&mut self) {
         assert!(self.edges.is_empty(), "Graph must have no edges");
         assert!(self.nodes.len() > 1, "Graph must have at least 2 nodes");
 
         let n = self.nodes.len();
         for u in 0..n {
             for v in u+1..n {
-                let weight = ((self.nodes[u].x - self.nodes[v].x).powi(2) + (self.nodes[u].y - self.nodes[v].y).powi(2)).sqrt() as i32;
+                let weight = self.nodes[u].distance(&self.nodes[v]) as i32;
                 self.add_edge(u as i32, v as i32, weight);
+            }
+        }
+    }
+
+    pub fn fill_with_edges_stochastic(&mut self, p: f64) {
+        assert!(self.edges.is_empty(), "Graph must have no edges");
+        assert!(self.nodes.len() > 1, "Graph must have at least 2 nodes");
+
+        let n = self.nodes.len();
+        // TODO: Check if the graph is connected
+        for u in 0..n {
+            for v in u+1..n {
+                if rand::random::<f64>() < p {
+                    let weight = self.nodes[u].distance(&self.nodes[v]) as i32;
+                    self.add_edge(u as i32, v as i32, weight);
+                }
             }
         }
     }
