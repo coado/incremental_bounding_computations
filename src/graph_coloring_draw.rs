@@ -6,7 +6,7 @@ use std::time::Duration;
 use nannou::prelude::*;
 
 use crate::graph::{Graph, Point};
-use crate::graph_coloring::{GraphColoring, Color};
+use crate::graph_coloring::{Color, GraphColoring, ScoreCalcType};
 
 struct Model {
     graph: Rc<Graph>,
@@ -66,7 +66,7 @@ fn model(_app: &App) -> Model {
     graph.fill_with_edges_stochastic(0.35);
 
     let graph = Rc::new(graph);
-    let mut graph_coloring = GraphColoring::new(Rc::clone(&graph));
+    let mut graph_coloring = GraphColoring::new(Rc::clone(&graph), ScoreCalcType::Naive);
     let starting_coloring = graph_coloring.coloring.clone();
     graph_coloring.graph_coloring();
 

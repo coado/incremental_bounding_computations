@@ -24,12 +24,19 @@ pub struct GraphColoring {
     pub coloring: Vec<Color>,
     pub number_of_colors: i32,
     pub history: Vec<Vec<Color>>,
+    score_type: ScoreCalcType
     // colors_buckets: HashMap<Color, Vec<PointId>>,
     // violating_edges_buckets: HashMap<Color, Vec<EdgeId>>
 }
 
+pub enum ScoreCalcType {
+    Naive,
+    Slow,
+    Incremental
+}
+
 impl GraphColoring {
-    pub fn new(graph: Rc<Graph>) -> GraphColoring {
+    pub fn new(graph: Rc<Graph>, score_type: ScoreCalcType) -> GraphColoring {
         let number_of_nodes = graph.get_number_of_nodes() as i32;
         let coloring = (0..number_of_nodes)
             .map(|_| Color(0))
@@ -44,6 +51,7 @@ impl GraphColoring {
             coloring,
             number_of_colors: 1,
             history: Vec::new(),
+            score_type
             // colors_buckets,
             // violating_edges_buckets
         }
@@ -61,6 +69,41 @@ impl GraphColoring {
 
     //     score as i32
     // }
+
+    fn calculate_score_naive_slow(&self) -> i32 {
+        let mut score: i32 = 0;
+
+        for color in 0..self.number_of_colors {
+            let mut amount: i32 = 0;
+            for u in 0..self.graph.get_number_of_nodes() as i32 {
+                if self.coloring[u as usize] == Color(color) {
+                    amount += 1;
+                }
+            }
+
+            score -= amount.pow(2);
+        }
+
+        for color in 0..self.number_of_colors {
+            let mut amount = 0;
+            let mut illegal_edges = 0;
+
+            for u in 0..self.graph.get_number_of_nodes() as i32 {
+                if self.coloring[u as usize] == Color(color) {
+                    amount += 1;
+                    for v in self.graph.get_adjacent_nodes(u) {
+                        if self.coloring[v as usize] == Color(color) {
+                            illegal_edges += 1;
+                        }
+                    }
+                }
+            }
+
+            score += 2 * illegal_edges * amount;
+        }
+
+        score
+    }
 
     fn calculate_score_naive(&self) -> i32 {
         let mut score = 0;
@@ -82,10 +125,18 @@ impl GraphColoring {
             let number_of_nodes = colors_freq[color as usize];
             let number_of_violating_edges = violating_edges_freq[color as usize];
 
-            score += (number_of_nodes * (2 * number_of_violating_edges - number_of_nodes));
+            score += number_of_nodes * (2 * number_of_violating_edges - number_of_nodes);
         }
 
         score
+    }
+
+    fn calc_score(&mut self) -> i32 {
+        match self.score_type {
+            ScoreCalcType::Naive => self.calculate_score_naive(),
+            ScoreCalcType::Slow => self.calculate_score_naive_slow(),
+            ScoreCalcType::Incremental => 0
+        }
     }
 
     fn try_swap_color_operation(&mut self, vertex: PointId, best_score: i32) -> Option<(i32, Color)> {
@@ -96,7 +147,7 @@ impl GraphColoring {
         for c in 0..self.number_of_colors {
             if c == starting_color { continue; } 
             self.coloring[vertex as usize] = Color(c);
-            let score = self.calculate_score_naive();
+            let score = self.calc_score();
 
             if score < current_best_score {
                 current_best_score = score;
@@ -118,7 +169,7 @@ impl GraphColoring {
 
         self.coloring[vertex as usize] = Color(self.number_of_colors);
         self.number_of_colors += 1;
-        let score = self.calculate_score_naive();
+        let score = self.calc_score();
 
         self.coloring[vertex as usize] = starting_color;
         self.number_of_colors -= 1;

@@ -8,22 +8,6 @@ pub struct TspComp {
     sealed: bool
 }
 
-pub fn create_computation_graph(input_nodes: &Vec<Art<i32>>) -> Art<i32> {
-    fn create_comp_graph(nodes: &Vec<Art<i32>>, left: usize, right: usize) -> Art<i32> {
-        if left == right {
-            return nodes[left].clone();
-        }
-    
-        let mid = left + (right - left) / 2;
-        let left_res = create_comp_graph(nodes, left, mid);
-        let right_res = create_comp_graph(nodes, mid + 1, right);
-    
-        thunk!(get!(left_res) + get!(right_res))
-    }
-
-    create_comp_graph(input_nodes, 0, input_nodes.len() - 1)        
-}
-
 impl TspComp {
     pub fn new(al: &'static Vec<Vec<i32>>, n: usize) -> TspComp {
         manage::init_dcg();
@@ -97,29 +81,7 @@ impl TspComp {
         }
         
         // subsequent layers sum up the edges
-        // TODO: make it better
-        while outputs.len() > 1 {
-            let mut new_outputs = Vec::with_capacity((outputs.len() + 1) / 2);
-            
-            let mut i = 0;
-            while i < outputs.len() {
-                if i + 1 < outputs.len() {
-                    let a = outputs[i].clone();
-                    let b = outputs[i + 1].clone();
-                    new_outputs.push(thunk!(get!(a) + get!(b)));
-                } else {
-                    new_outputs.push(outputs[i].clone());
-                }
-                i += 2;
-            }
-    
-            outputs = new_outputs;
-        }
-
-        outputs[0].clone()
-
-
-        
+        devide_and_conquer(&outputs, 0, outputs.len() - 1)
     }
 }
 

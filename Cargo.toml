@@ -9,16 +9,17 @@ edition = "2021"
 adapton = "0.3.31"
 criterion = "0.5.1"
 depends = "0.10.2"
+dotenv = "0.15.0"
 nannou = "0.19"
 
 [lib]
 name = "incremental_computations"
 path = "src/lib.rs"
 
-[[bench]]
-name = "adapton_benchmark"
-harness = false
+# [[bench]]
+# name = "adapton_benchmark"
+# harness = false
 
 [[bench]]
-name = "benchmark"
+name = "tsp_benchmark"
 harness = false

@@ -50,7 +50,7 @@ fn model(_app: &App) -> Model {
     tsp_graph.fill_with_edges_full();
 
     let tsp_graph = Rc::new(tsp_graph);
-    let mut tsp = Tsp::new(Rc::clone(&tsp_graph), false);
+    let mut tsp = Tsp::new(Rc::clone(&tsp_graph), true);
     let path = tsp.generate_starting_path();
     let length = tsp.tsp_2_opt().unwrap();
 
