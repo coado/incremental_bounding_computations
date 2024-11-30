@@ -2,7 +2,7 @@ use adapton::reflect::trace::*;
 
 #[derive(Default, Debug)]
 pub(crate) struct Diagnostics {
-    traces: Vec<Trace>,
+    pub traces: Vec<Trace>,
     pub thunks_count: usize,
     pub cells_count: usize,
 }
@@ -31,6 +31,17 @@ impl Diagnostics {
                     self.thunks_count += 1;
                 },
                 _ => {}
+            }
+        }
+    }
+
+    fn trace_edges(&mut self) {
+        for tr in &self.traces {
+            let edge = &tr.edge;
+            match edge {
+                EffectEdge::Fwd(next_edge) => {},
+                EffectEdge::Bwd(_) => {},
+                None => {}
             }
         }
     }
