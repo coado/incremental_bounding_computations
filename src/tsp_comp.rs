@@ -11,7 +11,11 @@ pub struct TspComp {
 impl TspComp {
     pub fn new(al: &'static Vec<Vec<i32>>, n: usize) -> TspComp {
         manage::init_dcg();
-        reflect::dcg_reflect_begin();
+
+        if cfg!(feature = "traces") {
+            println!("TspComp: traces enabled");
+            reflect::dcg_reflect_begin();
+        }
 
         let input_nodes = (0..n).map(|_| {
             cell!(0)
@@ -41,12 +45,13 @@ impl TspComp {
     pub fn seal(&mut self) {
         self.ensure_unsealed();
         self.sealed = true;
-        let traces = reflect::dcg_reflect_end();
-        let counts = reflect::trace::trace_count(&traces, None);
-        
-        // TODO: implement better diagnostics 
-        // println!("TspComp: traces: {:?}", counts);
-        // println!("Traces: {:?}", traces);
+
+        if cfg!(feature = "traces") {
+            let traces = reflect::dcg_reflect_end();
+            let counts = reflect::trace::trace_count(&traces, None);
+            println!("TspComp: traces: {:?}", counts);
+            // println!("Traces: {:?}", traces);
+        }    
     }
 
     fn ensure_unsealed(&mut self) {

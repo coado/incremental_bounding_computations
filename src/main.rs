@@ -21,5 +21,6 @@ fn main() {
 
     println!("Write DCG enabled: {}", write_dcg);
     // graph_coloring_draw::draw();
-    // tsp_draw::draw();
+    
+    tsp_draw::draw();
 }
