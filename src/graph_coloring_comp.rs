@@ -57,6 +57,7 @@ impl GraphColoringComp {
 
     pub fn create_computation_graph(&mut self) {
         self.create_guards_layer();
+        self.create_invalid_edges_layer();
         self.create_computation_layer();
         self.create_final_layer();    
     }
@@ -116,15 +117,20 @@ impl GraphColoringComp {
     }
 
     fn create_computation_layer(&mut self) {
-        let computations_layer = self.guards_layer
-            .iter()
-            .enumerate()
-            .map(|(c, vertecies_of_color)| {
-                let vertecies_of_color = vertecies_of_color.clone();
-                thunk!(
-                    get!(vertecies_of_color).pow(2)
-                )
+        let computations_layer = (0..self.number_of_colors)
+            .map(|c| {
+                let invalid_edges = self.invalid_edges_layer[c as usize].clone();
+                let vertecies_of_color = self.guards_layer[c as usize].clone();
+
+                let computation = thunk![{
+                    let invalid_edges = get!(invalid_edges);
+                    let vertecies_of_color = get!(vertecies_of_color);
+                    2 * vertecies_of_color * invalid_edges + vertecies_of_color.pow(2)
+                }];
+
+                computation
             }).collect::<Vec<Art<i32>>>();
+
 
         self.computations_layer = computations_layer;
     }
@@ -211,28 +217,46 @@ mod tests {
 
     #[test]
     fn test_computation_layer() {
-        let mut graph_coloring_comp = GraphColoringComp::new(Rc::new(Graph::default()), 3);
-        graph_coloring_comp.create_guards_layer();
-        graph_coloring_comp.create_computation_layer();
-        graph_coloring_comp.create_final_layer();
+        let mut graph = Graph::new();
+        graph.add_nodes((0..4).map(|_| Point::random()).collect());
+        graph.add_2d_edge(0, 2);
+        graph.add_2d_edge(0, 3);
+        graph.add_2d_edge(1, 2);
+        graph.add_2d_edge(1, 3);
+
+        let graph_rc = Rc::new(graph);
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 4);
+        graph_coloring_comp.create_computation_graph();
 
         let result = graph_coloring_comp.get_result();
-        assert_eq!(result, Some(9), "Result should be 9");
 
+        // 16 + 2 * 4 * 4 = 48
+        // vertecies_of_color**2 + 2 * vertecies_of_color * invalid_edges
+        assert_eq!(result, Some(48), "Result should be 48");
+        graph_coloring_comp.update_input_node(0, 1);
+        let result = graph_coloring_comp.get_result();
+
+        // 0: 9 + 2 * 3 * 2 = 21
+        // 1: 1 + 2 * 1 * 0 = 1
+        // 22 
+        assert_eq!(result, Some(22), "Result should be 22");
         graph_coloring_comp.update_input_node(1, 1);
-
         let result = graph_coloring_comp.get_result();
-        assert_eq!(result, Some(5), "Result should be 10");
 
-        graph_coloring_comp.update_input_node(2, 2);
-
-        let result = graph_coloring_comp.get_result();
-        assert_eq!(result, Some(3), "Result should be 10");
-
+        // 0: 4 + 2 * 2 * 0 = 4
+        // 1: 4 + 2 * 2 * 0 = 4
+        // 8
+        assert_eq!(result, Some(8), "Result should be 8");
         let diagnostics = graph_coloring_comp.seal();
-        assert!(diagnostics.cells_count == 3, "Cells count should be 3");
-        // 12 in guards layer + 3 in computations layer + 1 in final layer
-        assert!(diagnostics.thunks_count == 16, "Thunks count should be 16");
+        assert_eq!(diagnostics.cells_count, 4, "Cells count should be 4");
+
+        // granular_layer: 16
+        // guards_layer: 4
+        // invalid_edges_layer: 4
+        // computations_layer: 4
+        // final_layer: 1
+        // total: 29
+        assert_eq!(diagnostics.thunks_count, 29, "Thunks count should be 29");
     }
 
     #[test]
