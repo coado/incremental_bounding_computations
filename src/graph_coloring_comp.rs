@@ -110,11 +110,6 @@ impl GraphColoringComp {
                 }];
 
                 invalid_edges_thunk_res
-                // let vertecies_of_color = vertecies_of_color.clone();
-                // let res = thunk![{
-                //     // recompute only if number of vertecies of color changed
-                //     let fst = force_map(vertecies_of_color, |_, x| x);
-                // }];
             }).collect::<Vec<Art<i32>>>();
 
         self.invalid_edges_layer = invalid_edges_layer;
@@ -155,6 +150,8 @@ impl GraphColoringComp {
 
 #[cfg(test)]
 mod tests {
+    use crate::graph::Point;
+
     use super::*;
     use std::sync::Once;
 
@@ -236,5 +233,44 @@ mod tests {
         assert!(diagnostics.cells_count == 3, "Cells count should be 3");
         // 12 in guards layer + 3 in computations layer + 1 in final layer
         assert!(diagnostics.thunks_count == 16, "Thunks count should be 16");
+    }
+
+    #[test]
+    fn test_invalid_edges_layer() {
+        let mut graph = Graph::new();
+        graph.add_nodes((0..4).map(|_| Point::random()).collect());
+        graph.add_2d_edge(0, 2);
+        graph.add_2d_edge(0, 3);
+        graph.add_2d_edge(1, 2);
+        graph.add_2d_edge(1, 3);
+
+        let graph_rc = Rc::new(graph);
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 4);
+        graph_coloring_comp.create_guards_layer();
+        graph_coloring_comp.create_invalid_edges_layer();
+
+        let invalid_edges_layer = graph_coloring_comp.invalid_edges_layer.clone();
+        let invalid_edges = invalid_edges_layer.iter().map(|invalid_edges| {
+            get!(invalid_edges)
+        }).collect::<Vec<i32>>();
+
+        assert_eq!(invalid_edges, vec![4, 0, 0, 0], "Invalid edges should be [4, 0, 0, 0]");
+
+        graph_coloring_comp.update_input_node(0, 1);
+
+        let invalid_edges = invalid_edges_layer.iter().map(|invalid_edges| {
+            get!(invalid_edges)
+        }).collect::<Vec<i32>>();
+
+        assert_eq!(invalid_edges, vec![2, 0, 0, 0], "Invalid edges should be [2, 0, 0, 0]");
+
+        graph_coloring_comp.update_input_node(1, 1);
+
+        let invalid_edges = invalid_edges_layer.iter().map(|invalid_edges| {
+            get!(invalid_edges)
+        }).collect::<Vec<i32>>();
+
+        assert_eq!(invalid_edges, vec![0, 0, 0, 0], "Invalid edges should be [0, 0, 0, 0]");
+        
     }
 }

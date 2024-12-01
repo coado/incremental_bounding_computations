@@ -24,6 +24,10 @@ impl Point {
     fn distance(&self, other: &Point) -> f64 {
         ((self.x - other.x).powi(2) + (self.y - other.y).powi(2)).sqrt()
     }
+
+    pub fn random() -> Point {
+        Point::new(rand::random_range(0.0, 100.0), rand::random_range(0.0, 100.0))
+    }
 }
 
 #[derive(Debug)]
@@ -36,10 +40,10 @@ pub struct Edge {
 #[derive(Debug, Default)]
 pub struct Graph {
     nodes: Vec<Point>,
-    edges: Vec<Edge>,
+    pub edges: Vec<Edge>,
     adj_list: Vec<Vec<EdgeId>>,
     boundary: (Top, Bottom, Left, Right),
-    edges_lookup: HashMap<(PointId, PointId), EdgeId>,
+    pub edges_lookup: HashMap<(PointId, PointId), EdgeId>,
 }
 
 impl Graph {
@@ -53,7 +57,7 @@ impl Graph {
         }
     }
 
-    fn add_edge(&mut self, u: i32, v: i32, weight: i32) {
+    pub fn add_edge(&mut self, u: i32, v: i32, weight: i32) {
         let n = self.adj_list.len() as i32;
         assert!(
             u >= 0 && u < n && v >= 0 && v < n,
@@ -69,7 +73,12 @@ impl Graph {
         self.edges_lookup.insert((u.min(v), u.max(v)), id);
     }
 
-    fn add_nodes(&mut self, points: Vec<Point>) {
+    pub fn add_2d_edge(&mut self, u: i32, v: i32) {
+        let weight = self.nodes[u as usize].distance(&self.nodes[v as usize]) as i32;
+        self.add_edge(u, v, weight);
+    }
+
+    pub fn add_nodes(&mut self, points: Vec<Point>) {
         for point in points {
             self.nodes.push(point);
             self.adj_list.push(Vec::new());
@@ -113,8 +122,7 @@ impl Graph {
         let n = self.nodes.len();
         for u in 0..n {
             for v in u+1..n {
-                let weight = self.nodes[u].distance(&self.nodes[v]) as i32;
-                self.add_edge(u as i32, v as i32, weight);
+                self.add_2d_edge(u as i32, v as i32);
             }
         }
     }
@@ -128,8 +136,7 @@ impl Graph {
         for u in 0..n {
             for v in u+1..n {
                 if rand::random::<f64>() < p {
-                    let weight = self.nodes[u].distance(&self.nodes[v]) as i32;
-                    self.add_edge(u as i32, v as i32, weight);
+                    self.add_2d_edge(u as i32, v as i32);
                 }
             }
         }
@@ -157,6 +164,7 @@ impl Graph {
 }
 
 // Creating graph from adjacency list and number of nodes
+// only full graph is supported for now
 impl From<(usize, Vec<Vec<i32>>)> for Graph {
     fn from(data: (usize, Vec<Vec<i32>>)) -> Self {
         let (size, adj_list) = data;
