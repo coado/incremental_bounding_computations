@@ -3,20 +3,23 @@ use adapton::engine::*;
 use adapton::reflect;
 
 use crate::diagnostics::Diagnostics;
+use crate::graph::Graph;
 
 pub struct GraphColoringComp {
     input_nodes_layer: Vec<Art<i32>>,
+    granular_guards_layer: Vec<Vec<Art<bool>>>,
     guards_layer: Vec<Art<i32>>,
     computations_layer: Vec<Art<i32>>,
+    invalid_edges_layer: Vec<Art<i32>>,
     result: Option<Art<i32>>,
     sealed: bool,
     number_of_colors: i32,
-    al: &'static Vec<Vec<i32>>,
-    diagnostics: Option<Diagnostics>
+    diagnostics: Option<Diagnostics>,
+    graph: Rc<Graph>
 }
 
 impl GraphColoringComp {
-    pub fn new(al: &'static Vec<Vec<i32>>, n: usize) -> GraphColoringComp {
+    pub fn new(graph: Rc<Graph>, n: usize) -> GraphColoringComp {
         manage::init_dcg();
         reflect::dcg_reflect_begin();
 
@@ -27,17 +30,15 @@ impl GraphColoringComp {
         GraphColoringComp {
             input_nodes_layer,
             guards_layer: Vec::new(),
+            granular_guards_layer: Vec::new(),
             computations_layer: Vec::new(),
+            invalid_edges_layer: Vec::new(),
             result: None,
             sealed: false,
             number_of_colors: n as i32,
-            al,
-            diagnostics: None
+            diagnostics: None,
+            graph
         }
-    }
-
-    pub fn create_computation_graph(&self) {
-        
     }
 
     pub fn seal(&mut self) -> &Diagnostics {
@@ -54,6 +55,12 @@ impl GraphColoringComp {
         set(&self.input_nodes_layer[idx], val);
     }
 
+    pub fn create_computation_graph(&mut self) {
+        self.create_guards_layer();
+        self.create_computation_layer();
+        self.create_final_layer();    
+    }
+
     fn ensure_unsealed(&mut self) {
         assert!(!self.sealed, "Graph Coloring is sealed");
     }
@@ -65,12 +72,52 @@ impl GraphColoringComp {
                     let input_node_clone = input_node.clone();
                     thunk!(get!(input_node_clone) == c)
                 }).collect::<Vec<Art<bool>>>();
-
+                self.granular_guards_layer.push(guards.clone());
                 thunk!(guards.iter().fold(0, |acc, guard| acc + i32::from(get!(guard))))
             })
             .collect::<Vec<Art<i32>>>();
         
         self.guards_layer = guards_layer;
+    }
+
+    fn create_invalid_edges_layer(&mut self) {
+        let invalid_edges_layer = self.granular_guards_layer
+            .iter()
+            .enumerate()
+            .map(|(c, granular_guards)| {
+                let graph_rc = Rc::clone(&self.graph);
+                let granular_guards_clone = granular_guards.clone();
+                let invalid_edges_thunk_res = thunk![{
+                    let mut nodes: Vec<usize> = Vec::new();
+                    for (i, g) in granular_guards_clone.iter().enumerate() {
+                        if get!(g) {
+                            nodes.push(i);
+                        }
+                    }
+                    
+                    let mut invalid_edges = 0;
+                    for i in 0..nodes.len() {
+                        for j in i+1..nodes.len() {
+                            let edge = graph_rc.get_edge_from_lookup(nodes[i] as i32, nodes[j] as i32);
+                            match edge {
+                                Some(_) => invalid_edges += 1,
+                                None => ()
+                            }
+                        }
+                    }
+
+                    invalid_edges
+                }];
+
+                invalid_edges_thunk_res
+                // let vertecies_of_color = vertecies_of_color.clone();
+                // let res = thunk![{
+                //     // recompute only if number of vertecies of color changed
+                //     let fst = force_map(vertecies_of_color, |_, x| x);
+                // }];
+            }).collect::<Vec<Art<i32>>>();
+
+        self.invalid_edges_layer = invalid_edges_layer;
     }
 
     fn create_computation_layer(&mut self) {
@@ -132,8 +179,7 @@ mod tests {
 
     #[test]
     fn test_guards_layer() {
-        let static_al = lazy_init_static_al();
-        let mut graph_coloring_comp = GraphColoringComp::new(static_al, 3);
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::new(Graph::default()), 3);
         graph_coloring_comp.create_guards_layer();
         
         assert!(graph_coloring_comp.guards_layer.len() == 3, "Guards layer should have 3 guards");
@@ -149,22 +195,26 @@ mod tests {
 
     #[test]
     fn test_diagnostics() {
-        let static_al = lazy_init_static_al();
-        let mut graph_coloring_comp = GraphColoringComp::new(static_al, 3);
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::new(Graph::default()), 3);
+        graph_coloring_comp.create_guards_layer();
         assert!(graph_coloring_comp.guards_layer.len() == 3, "Guards layer should have 3 guards");
 
+        get!(graph_coloring_comp.guards_layer[0]);
+        get!(graph_coloring_comp.guards_layer[1]);
+        get!(graph_coloring_comp.guards_layer[2]);
         graph_coloring_comp.update_input_node(1, 1);
+        get!(graph_coloring_comp.guards_layer[0]);
+        get!(graph_coloring_comp.guards_layer[1]);
+        get!(graph_coloring_comp.guards_layer[2]);
         let diagnostics = graph_coloring_comp.seal();
 
         assert!(diagnostics.cells_count == 3, "Cells count should be 3");
         assert!(diagnostics.thunks_count == 12, "Thunks count should be 12");
-        
     }
 
     #[test]
     fn test_computation_layer() {
-        let static_al = lazy_init_static_al();
-        let mut graph_coloring_comp = GraphColoringComp::new(static_al, 3);
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::new(Graph::default()), 3);
         graph_coloring_comp.create_guards_layer();
         graph_coloring_comp.create_computation_layer();
         graph_coloring_comp.create_final_layer();
@@ -186,7 +236,5 @@ mod tests {
         assert!(diagnostics.cells_count == 3, "Cells count should be 3");
         // 12 in guards layer + 3 in computations layer + 1 in final layer
         assert!(diagnostics.thunks_count == 16, "Thunks count should be 16");
-
-        println!("{:?}", diagnostics.traces);
     }
 }
