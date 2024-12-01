@@ -21,7 +21,11 @@ pub struct GraphColoringComp {
 impl GraphColoringComp {
     pub fn new(graph: Rc<Graph>, n: usize) -> GraphColoringComp {
         manage::init_dcg();
-        reflect::dcg_reflect_begin();
+
+        if cfg!(feature = "traces") {
+            println!("GraphColoringComp: traces enabled");
+            reflect::dcg_reflect_begin();
+        }
 
         let input_nodes_layer = (0..n).map(|_| {
             cell!(0)
@@ -41,13 +45,15 @@ impl GraphColoringComp {
         }
     }
 
-    pub fn seal(&mut self) -> &Diagnostics {
+    pub fn seal(&mut self) {
         self.ensure_unsealed();
         self.sealed = true;
-        let traces = reflect::dcg_reflect_end();
-        let diagnostics = Diagnostics::new(traces).analyse();
-        self.diagnostics = Some(diagnostics);
-        self.diagnostics.as_ref().unwrap()
+
+        if cfg!(feature = "traces") {
+            let traces = reflect::dcg_reflect_end();
+            let diagnostics = Diagnostics::new(traces).analyse();
+            self.diagnostics = Some(diagnostics);
+        }
     }
 
     pub fn update_input_node(&mut self, idx: usize, val: i32) {
@@ -209,10 +215,14 @@ mod tests {
         get!(graph_coloring_comp.guards_layer[0]);
         get!(graph_coloring_comp.guards_layer[1]);
         get!(graph_coloring_comp.guards_layer[2]);
-        let diagnostics = graph_coloring_comp.seal();
 
-        assert!(diagnostics.cells_count == 3, "Cells count should be 3");
-        assert!(diagnostics.thunks_count == 12, "Thunks count should be 12");
+        graph_coloring_comp.seal();
+        let diagnostics = graph_coloring_comp.diagnostics;
+        
+        if let Some(diag) = diagnostics {
+            assert!(diag.cells_count == 3, "Cells count should be 3");
+            assert!(diag.thunks_count == 12, "Thunks count should be 12");
+        }
     }
 
     #[test]
@@ -247,16 +257,20 @@ mod tests {
         // 1: 4 + 2 * 2 * 0 = 4
         // 8
         assert_eq!(result, Some(8), "Result should be 8");
-        let diagnostics = graph_coloring_comp.seal();
-        assert_eq!(diagnostics.cells_count, 4, "Cells count should be 4");
 
-        // granular_layer: 16
-        // guards_layer: 4
-        // invalid_edges_layer: 4
-        // computations_layer: 4
-        // final_layer: 1
-        // total: 29
-        assert_eq!(diagnostics.thunks_count, 29, "Thunks count should be 29");
+        graph_coloring_comp.seal();
+        
+        if let Some(diag) = graph_coloring_comp.diagnostics {
+            assert_eq!(diag.cells_count, 4, "Cells count should be 4");
+
+            // granular_layer: 16
+            // guards_layer: 4
+            // invalid_edges_layer: 4
+            // computations_layer: 4
+            // final_layer: 1
+            // total: 29
+            assert_eq!(diag.thunks_count, 29, "Thunks count should be 29");
+        }
     }
 
     #[test]
