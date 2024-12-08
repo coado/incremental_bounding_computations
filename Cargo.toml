@@ -26,3 +26,7 @@ path = "src/lib.rs"
 [[bench]]
 name = "tsp_benchmark"
 harness = false
+
+# [[bench]]
+# name = "graph_coloring_benchmark"
+# harness = false

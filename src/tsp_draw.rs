@@ -5,7 +5,7 @@ use std::time::Duration;
 use nannou::prelude::*;
 
 use crate::graph::{Graph, Point};
-use crate::tsp::{Tsp, TspPath};
+use crate::tsp::{Tsp, TspPath, ScoreCalcTypeTSP};
 
 struct Model {
     graph: Rc<Graph>,
@@ -50,9 +50,9 @@ fn model(_app: &App) -> Model {
     tsp_graph.fill_with_edges_full();
 
     let tsp_graph = Rc::new(tsp_graph);
-    let mut tsp = Tsp::new(Rc::clone(&tsp_graph), true);
+    let mut tsp = Tsp::new(Rc::clone(&tsp_graph), ScoreCalcTypeTSP::Fast);
     let path = tsp.generate_starting_path();
-    let length = tsp.tsp_2_opt().unwrap();
+    let length = tsp.tsp().unwrap();
 
     Model {
         graph: tsp_graph,

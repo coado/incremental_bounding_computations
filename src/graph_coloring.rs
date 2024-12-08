@@ -1,8 +1,9 @@
 use std::{rc::Rc};
 use crate::graph::{Graph, PointId};
 use nannou::rand;
+use crate::graph_coloring_comp::GraphColoringComp;
 
-const NUMBER_OF_ITERATIONS: i32 = 1000;
+const NUMBER_OF_ITERATIONS: i32 = 500;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Color(pub i32);
@@ -24,9 +25,8 @@ pub struct GraphColoring {
     pub coloring: Vec<Color>,
     pub number_of_colors: i32,
     pub history: Vec<Vec<Color>>,
-    score_type: ScoreCalcType
-    // colors_buckets: HashMap<Color, Vec<PointId>>,
-    // violating_edges_buckets: HashMap<Color, Vec<EdgeId>>
+    score_type: ScoreCalcType,
+    comp: Option<GraphColoringComp>
 }
 
 pub enum ScoreCalcType {
@@ -42,18 +42,24 @@ impl GraphColoring {
             .map(|_| Color(0))
             .collect::<Vec<Color>>();
 
-        // let mut colors_buckets = HashMap::new();
-        // let violating_edges_buckets = HashMap::new();
-        // colors_buckets.insert(Color(0), (0..number_of_nodes).collect::<Vec<PointId>>());
+        let comp = match &score_type {
+            ScoreCalcType::Incremental => {
+                let mut comp = GraphColoringComp::new(Rc::clone(&graph), number_of_nodes as usize);
+                comp.create_computation_graph();
+                comp.get_result();
+                Some(comp)
+            },
+            _ => None
+        };
+
 
         GraphColoring {
             graph,
             coloring,
             number_of_colors: 1,
             history: Vec::new(),
-            score_type
-            // colors_buckets,
-            // violating_edges_buckets
+            score_type,
+            comp
         }
     }
 
@@ -132,11 +138,29 @@ impl GraphColoring {
     }
 
     fn calc_score(&mut self) -> i32 {
-        match self.score_type {
+        let res = match &self.score_type {
             ScoreCalcType::Naive => self.calculate_score_naive(),
             ScoreCalcType::Slow => self.calculate_score_naive_slow(),
-            ScoreCalcType::Incremental => 0
+            ScoreCalcType::Incremental => {
+                let comp = self.comp.as_mut().unwrap();
+                comp.get_result().unwrap()
+            }
+        };
+
+        res
+    }
+
+    fn set_color(&mut self, v: usize, color: Color) {
+        
+        match &mut self.score_type {
+            ScoreCalcType::Incremental => {
+                let comp = self.comp.as_mut().unwrap();
+                comp.update_input_node(v, color.0);
+            },
+            _ => {}
         }
+
+        self.coloring[v] = color;
     }
 
     fn try_swap_color_operation(&mut self, vertex: PointId, best_score: i32) -> Option<(i32, Color)> {
@@ -146,7 +170,8 @@ impl GraphColoring {
 
         for c in 0..self.number_of_colors {
             if c == starting_color { continue; } 
-            self.coloring[vertex as usize] = Color(c);
+            // self.coloring[vertex as usize] = Color(c);
+            self.set_color(vertex as usize, Color(c));
             let score = self.calc_score();
 
             if score < current_best_score {
@@ -155,7 +180,10 @@ impl GraphColoring {
             }
         }
 
-        self.coloring[vertex as usize] = starting_color;
+        // println!("Best color: {:?}, starting color: {:?}", best_color, starting_color);
+
+        // self.coloring[vertex as usize] = starting_color;
+        self.set_color(vertex as usize, starting_color);
 
         match best_color == starting_color {
             true => None,
@@ -167,22 +195,24 @@ impl GraphColoring {
 
         let starting_color = self.coloring[vertex as usize];
 
-        self.coloring[vertex as usize] = Color(self.number_of_colors);
+        // self.coloring[vertex as usize] = Color(self.number_of_colors);
+        self.set_color(vertex as usize, Color(self.number_of_colors));
         self.number_of_colors += 1;
         let score = self.calc_score();
 
-        self.coloring[vertex as usize] = starting_color;
+        // self.coloring[vertex as usize] = starting_color;
+        self.set_color(vertex as usize, starting_color);
         self.number_of_colors -= 1;
 
         match score < best_score {
             true => Some((score, Color(self.number_of_colors))),
             false => None
         }
-
     }
 
     pub fn graph_coloring(&mut self) {
-        let mut best_score = self.calculate_score_naive();
+        // let mut best_score = self.calculate_score_naive();
+        let mut best_score = self.calc_score();
         
         for _ in 0..NUMBER_OF_ITERATIONS {
             let u = rand::random_range(0, self.graph.get_number_of_nodes() as i32);
@@ -197,27 +227,47 @@ impl GraphColoring {
 
                     if swap_color_score <= new_color_score {
                         best_score = swap_color_score;
-                        self.coloring[u as usize] = swap_color_res.1;
+                        // self.coloring[u as usize] = swap_color_res.1;
+                        self.set_color(u as usize, swap_color_res.1);
                     } else {
                         best_score = new_color_score;
-                        self.coloring[u as usize] = new_color_res.1;
+                        // self.coloring[u as usize] = new_color_res.1;
+                        self.set_color(u as usize, new_color_res.1);
                         self.number_of_colors += 1;
                     }
                     self.history.push(self.coloring.clone());
                 },
                 (Some(swap_color_res), None) => {
                     best_score = swap_color_res.0;
-                    self.coloring[u as usize] = swap_color_res.1;
+                    // self.coloring[u as usize] = swap_color_res.1;
+                    self.set_color(u as usize, swap_color_res.1);
                     self.history.push(self.coloring.clone());
                 },
                 (None, Some(new_color_res)) => {
                     best_score = new_color_res.0;
-                    self.coloring[u as usize] = new_color_res.1;
+                    // self.coloring[u as usize] = new_color_res.1;
+                    self.set_color(u as usize, new_color_res.1);
                     self.number_of_colors += 1;
                     self.history.push(self.coloring.clone());
                 },
                 (None, None) => {}
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_graph_coloring() {
+        let mut graph = Graph::new();
+        graph.fill_with_random_points(10);
+        graph.fill_with_edges_stochastic(0.35);
+
+        let graph = Rc::new(graph);
+        let mut graph_coloring = GraphColoring::new(Rc::clone(&graph), ScoreCalcType::Incremental);
+        graph_coloring.graph_coloring();
     }
 }

@@ -6,31 +6,49 @@ use nannou::rand;
 
 pub type TspPath = Vec<PointId>;
 
+pub enum ScoreCalcTypeTSP {
+    Fast,
+    Slow,
+    Incremental
+}
+
 pub struct Tsp {
     graph:  Rc<Graph>,
     history: Vec<TspPath>,
     path: TspPath,
+    score_calc_type: ScoreCalcTypeTSP,
     computation_graph: Option<TspComp>,
 }
 
+fn unsafe_create_static_pointer(al: Vec<Vec<i32>>) -> &'static Vec<Vec<i32>> {
+    static mut AL: *const Vec<Vec<i32>> = std::ptr::null();
+
+    unsafe {
+        AL = Box::into_raw(Box::new(al));
+    }
+
+    unsafe { &*AL }
+}
+
 impl Tsp {
-    pub fn new(graph: Rc<Graph>, with_incremental_computation: bool) -> Tsp {
+    pub fn new(graph: Rc<Graph>, score_calc_type: ScoreCalcTypeTSP) -> Tsp {
         let number_of_nodes = graph.get_number_of_nodes();
 
-        let computation_graph = match with_incremental_computation {
-            true => {
+        let computation_graph = match score_calc_type {
+            ScoreCalcTypeTSP::Incremental => {
                 let al = graph.get_raw_adjacency_list();
-                let static_al: &'static mut Vec<Vec<i32>> = Box::leak(Box::new(al));
+                let static_al = unsafe_create_static_pointer(al);
                 Some(TspComp::new(static_al, number_of_nodes))
             },
-            false => None
+            _ => None
         };
 
         Tsp {
             graph,
             path: Vec::new(),
             history: Vec::new(),
-            computation_graph
+            computation_graph,
+            score_calc_type
         }
     }
 
@@ -57,17 +75,6 @@ impl Tsp {
         self.path.clone()
     }
 
-    fn calculate_path_length(&self) -> i32 {
-        match &self.computation_graph {
-            Some(comp_graph) => {
-                comp_graph.get_result()
-            },
-            None => {
-                self.calculate_path_length_naive()
-            }
-        }
-    }
-
     fn calculate_path_length_naive(&self) -> i32 {
         let mut length = 0;
         let n = self.path.len();
@@ -78,6 +85,17 @@ impl Tsp {
         }
 
         length
+    }
+
+    fn calculate_path_length(&self) -> i32 {
+        match &self.score_calc_type {
+            ScoreCalcTypeTSP::Incremental => {
+                self.computation_graph.as_ref().unwrap().get_result()
+            },
+            _ => {
+                self.calculate_path_length_naive()
+            }
+        }
     }
 
     fn swap_edges(&mut self, mut i: usize, mut j: usize) {
@@ -103,7 +121,7 @@ impl Tsp {
         }
     }
 
-    pub fn tsp_2_opt(&mut self) -> Result<i32, ()> {
+    pub fn tsp(&mut self) -> Result<i32, ()> {
         let mut best_length = self.calculate_path_length();
         let n = self.path.len() as usize;
         let mut improved = true;
@@ -114,34 +132,36 @@ impl Tsp {
             improved = false;
             for i in 0..n-1 {
                 for j in i+2..n {
+                    match &self.score_calc_type {
+                        ScoreCalcTypeTSP::Fast => {
+                            let e1 = self.graph.get_edge_from_lookup(self.path[i], self.path[i+1]).unwrap().weight;
+                            let e2 = self.graph.get_edge_from_lookup(self.path[j], self.path[(j+1)%n]).unwrap().weight;
+                            let ne1 = self.graph.get_edge_from_lookup(self.path[i], self.path[j]).unwrap().weight;
+                            let ne2 = self.graph.get_edge_from_lookup(self.path[i+1], self.path[(j+1)%n]).unwrap().weight;
+                            
+                            let delta = (ne1 + ne2) - (e1 + e2);
 
-                    // let e1 = self.graph.get_edge_from_lookup(self.path[i], self.path[i+1]).unwrap().weight;
-                    // let e2 = self.graph.get_edge_from_lookup(self.path[j], self.path[(j+1)%n]).unwrap().weight;
-                    // let ne1 = self.graph.get_edge_from_lookup(self.path[i], self.path[j]).unwrap().weight;
-                    // let ne2 = self.graph.get_edge_from_lookup(self.path[i+1], self.path[(j+1)%n]).unwrap().weight;
-                    
-                    // let delta = (ne1 + ne2) - (e1 + e2);
+                            if delta < 0 {
+                                self.swap_edges(i, j);
+                                improved = true;
+                                best_length += delta;
+                                history.push(self.path.clone());
+                            }
+                        },
+                        _ => {
+                            self.swap_edges(i, j);
+                            let new_length = self.calculate_path_length();
 
-                    
-                    self.swap_edges(i, j);
-                    let new_length = self.calculate_path_length();
-
-                    if new_length < best_length {
-                        best_length = new_length;
-                        improved = true;
-                        history.push(self.path.clone());
-                    } else {
-                        // reverse
-                        self.swap_edges(i, j);
+                            if new_length < best_length {
+                                best_length = new_length;
+                                improved = true;
+                                history.push(self.path.clone());
+                            } else {
+                                // reverse
+                                self.swap_edges(i, j);
+                            }
+                        }
                     }
-
-                    // if delta < 0 {
-                    //     self.swap_edges(i, j);
-                    //     improved = true;
-                    //     best_length = self.calculate_path_length();
-                    //     history.push(self.path.clone());
-                    // }
-
                 }
             }
         }
@@ -162,7 +182,7 @@ impl Tsp {
 
 impl From<Graph> for Tsp {
     fn from(graph: Graph) -> Tsp {
-        Tsp::new(Rc::new(graph), false)
+        Tsp::new(Rc::new(graph), ScoreCalcTypeTSP::Fast)
     }
 }
 
@@ -171,7 +191,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_tsp() {
+    fn test_tsp_slow() {
         let size = 5;
         let al = vec![
             vec![0, 1, 7, 6, 1],
@@ -183,14 +203,57 @@ mod tests {
 
         let graph = Rc::new(Graph::from((size, al)));
         let path = vec![4, 3, 0, 2, 1];
-        let mut tsp = Tsp::new(Rc::clone(&graph), false);
+        let mut tsp = Tsp::new(Rc::clone(&graph), ScoreCalcTypeTSP::Slow);
         tsp.set_starting_path(path);
 
-        let length = tsp.tsp_2_opt().unwrap();
+        let length = tsp.tsp().unwrap();
         assert_eq!(length, 5);
 
         let path = tsp.get_path();
         assert_eq!(path, &vec![4, 0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn test_tsp_fast() {
+        let size = 5;
+        let al = vec![
+            vec![0, 1, 7, 6, 1],
+            vec![1, 0, 1, 4, 9],
+            vec![7, 1, 0, 1, 8],
+            vec![6, 4, 1, 0, 1],
+            vec![1, 9, 8, 1, 0]
+        ];
+
+        let graph = Rc::new(Graph::from((size, al)));
+        let path = vec![4, 3, 0, 2, 1];
+        let mut tsp = Tsp::new(Rc::clone(&graph), ScoreCalcTypeTSP::Fast);
+        tsp.set_starting_path(path);
+
+        let length = tsp.tsp().unwrap();
+        assert_eq!(length, 5);
+
+        let path = tsp.get_path();
+        assert_eq!(path, &vec![4, 0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn test_tsp_incremental() {
+        let size = 5;
+        let al = vec![
+            vec![0, 1, 7, 6, 1],
+            vec![1, 0, 1, 4, 9],
+            vec![7, 1, 0, 1, 8],
+            vec![6, 4, 1, 0, 1],
+            vec![1, 9, 8, 1, 0]
+        ];
+
+        let graph = Rc::new(Graph::from((size, al)));
+        let path = vec![4, 3, 0, 2, 1];
+        let mut tsp = Tsp::new(Rc::clone(&graph), ScoreCalcTypeTSP::Incremental);
+        tsp.set_starting_path(path);
+
+        let length = tsp.tsp().unwrap();
+        assert_eq!(length, 5);
     }
 
     #[test]
@@ -206,10 +269,10 @@ mod tests {
 
         let graph = Rc::new(Graph::from((size, al)));
         let path = vec![4, 3, 0, 2, 1];
-        let mut tsp = Tsp::new(Rc::clone(&graph), false);
+        let mut tsp = Tsp::new(Rc::clone(&graph), ScoreCalcTypeTSP::Slow);
         tsp.set_starting_path(path);
 
-        let length = tsp.tsp_2_opt().unwrap();
+        let length = tsp.tsp().unwrap();
         assert_eq!(length, 5);
 
         tsp.swap_edges(1, 3);
@@ -224,25 +287,5 @@ mod tests {
 
         assert_eq!(length, length3);
     } 
-
-    #[test]
-    fn test_incremental_computation_tsp() {
-        let size = 5;
-        let al = vec![
-            vec![0, 1, 7, 6, 1],
-            vec![1, 0, 1, 4, 9],
-            vec![7, 1, 0, 1, 8],
-            vec![6, 4, 1, 0, 1],
-            vec![1, 9, 8, 1, 0]
-        ];
-
-        let graph = Rc::new(Graph::from((size, al)));
-        let path = vec![4, 3, 0, 2, 1];
-        let mut tsp = Tsp::new(Rc::clone(&graph), true);
-        tsp.set_starting_path(path);
-
-        let length = tsp.tsp_2_opt().unwrap();
-        assert_eq!(length, 5);
-    }
 }
 
