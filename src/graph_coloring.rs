@@ -1,9 +1,6 @@
-use std::{rc::Rc};
+use std::rc::Rc;
 use crate::graph::{Graph, PointId};
-use nannou::rand;
 use crate::graph_coloring_comp::GraphColoringComp;
-
-const NUMBER_OF_ITERATIONS: i32 = 500;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Color(pub i32);
@@ -25,25 +22,25 @@ pub struct GraphColoring {
     pub coloring: Vec<Color>,
     pub number_of_colors: i32,
     pub history: Vec<Vec<Color>>,
-    score_type: ScoreCalcType,
+    score_type: ScoreCalcTypeGraphColoring,
     comp: Option<GraphColoringComp>
 }
 
-pub enum ScoreCalcType {
-    Naive,
+pub enum ScoreCalcTypeGraphColoring {
+    Fast,
     Slow,
     Incremental
 }
 
 impl GraphColoring {
-    pub fn new(graph: Rc<Graph>, score_type: ScoreCalcType) -> GraphColoring {
+    pub fn new(graph: Rc<Graph>, score_type: ScoreCalcTypeGraphColoring) -> GraphColoring {
         let number_of_nodes = graph.get_number_of_nodes() as i32;
         let coloring = (0..number_of_nodes)
             .map(|_| Color(0))
             .collect::<Vec<Color>>();
 
         let comp = match &score_type {
-            ScoreCalcType::Incremental => {
+            ScoreCalcTypeGraphColoring::Incremental => {
                 let mut comp = GraphColoringComp::new(Rc::clone(&graph), number_of_nodes as usize);
                 comp.create_computation_graph();
                 comp.get_result();
@@ -113,7 +110,7 @@ impl GraphColoring {
 
     fn calculate_score_naive(&self) -> i32 {
         let mut score = 0;
-        let mut colors_freq = (0..self.number_of_colors).map(|_| i32::default()).collect::<Vec<i32>>();
+        let mut colors_freq = (0..self.graph.get_number_of_nodes()).map(|_| i32::default()).collect::<Vec<i32>>();
         let mut violating_edges_freq = colors_freq.clone();
 
         for u in 0..self.graph.get_number_of_nodes() as i32 {
@@ -139,9 +136,9 @@ impl GraphColoring {
 
     fn calc_score(&mut self) -> i32 {
         let res = match &self.score_type {
-            ScoreCalcType::Naive => self.calculate_score_naive(),
-            ScoreCalcType::Slow => self.calculate_score_naive_slow(),
-            ScoreCalcType::Incremental => {
+            ScoreCalcTypeGraphColoring::Fast => self.calculate_score_naive(),
+            ScoreCalcTypeGraphColoring::Slow => self.calculate_score_naive_slow(),
+            ScoreCalcTypeGraphColoring::Incremental => {
                 let comp = self.comp.as_mut().unwrap();
                 comp.get_result().unwrap()
             }
@@ -153,7 +150,7 @@ impl GraphColoring {
     fn set_color(&mut self, v: usize, color: Color) {
         
         match &mut self.score_type {
-            ScoreCalcType::Incremental => {
+            ScoreCalcTypeGraphColoring::Incremental => {
                 let comp = self.comp.as_mut().unwrap();
                 comp.update_input_node(v, color.0);
             },
@@ -163,14 +160,13 @@ impl GraphColoring {
         self.coloring[v] = color;
     }
 
-    fn try_swap_color_operation(&mut self, vertex: PointId, best_score: i32) -> Option<(i32, Color)> {
+    fn try_swap_color_operation(&mut self, vertex: PointId, best_score: i32) -> i32 {
         let mut current_best_score = best_score;
         let starting_color = self.coloring[vertex as usize];
         let mut best_color = starting_color;
 
         for c in 0..self.number_of_colors {
             if c == starting_color { continue; } 
-            // self.coloring[vertex as usize] = Color(c);
             self.set_color(vertex as usize, Color(c));
             let score = self.calc_score();
 
@@ -180,94 +176,103 @@ impl GraphColoring {
             }
         }
 
-        // println!("Best color: {:?}, starting color: {:?}", best_color, starting_color);
 
-        // self.coloring[vertex as usize] = starting_color;
-        self.set_color(vertex as usize, starting_color);
-
-        match best_color == starting_color {
-            true => None,
-            false => Some((current_best_score, best_color))
-        }
+        self.set_color(vertex as usize, best_color);
+        current_best_score
     }
 
-    fn try_new_color_operation(&mut self, vertex: PointId, best_score: i32) -> Option<(i32, Color)> {
+    fn try_new_color_operation(&mut self, vertex: PointId, best_score: i32) -> i32 {
+        if self.number_of_colors == self.graph.get_number_of_nodes() as i32 {
+            // There are no more colors to try
+            return best_score;
+        }
 
         let starting_color = self.coloring[vertex as usize];
-
-        // self.coloring[vertex as usize] = Color(self.number_of_colors);
         self.set_color(vertex as usize, Color(self.number_of_colors));
-        self.number_of_colors += 1;
         let score = self.calc_score();
-
-        // self.coloring[vertex as usize] = starting_color;
-        self.set_color(vertex as usize, starting_color);
-        self.number_of_colors -= 1;
-
-        match score < best_score {
-            true => Some((score, Color(self.number_of_colors))),
-            false => None
+        
+        if score < best_score {
+            self.number_of_colors += 1;
+            return score;
+        } else {
+            self.set_color(vertex as usize, starting_color);
+            return best_score;
         }
     }
 
-    pub fn graph_coloring(&mut self) {
-        // let mut best_score = self.calculate_score_naive();
+    pub fn graph_coloring(&mut self) -> i32 {
         let mut best_score = self.calc_score();
+        let mut incremented: bool = true;
         
-        for _ in 0..NUMBER_OF_ITERATIONS {
-            let u = rand::random_range(0, self.graph.get_number_of_nodes() as i32);
+        while incremented {
+            incremented = false;
+            for u in 0..self.graph.get_number_of_nodes() as i32 {
+                let tmp_best_score = best_score;
+                best_score = self.try_swap_color_operation(u as i32, best_score);
+                best_score = self.try_new_color_operation(u as i32, best_score);
 
-            let swap_color_best_result = self.try_swap_color_operation(u as i32, best_score);
-            let new_color_best_result = self.try_new_color_operation(u as i32, best_score);
-
-            match (swap_color_best_result, new_color_best_result) {
-                (Some(swap_color_res), Some(new_color_res)) => {
-                    let swap_color_score = swap_color_res.0;
-                    let new_color_score = new_color_res.0;
-
-                    if swap_color_score <= new_color_score {
-                        best_score = swap_color_score;
-                        // self.coloring[u as usize] = swap_color_res.1;
-                        self.set_color(u as usize, swap_color_res.1);
-                    } else {
-                        best_score = new_color_score;
-                        // self.coloring[u as usize] = new_color_res.1;
-                        self.set_color(u as usize, new_color_res.1);
-                        self.number_of_colors += 1;
-                    }
+                if tmp_best_score != best_score {
                     self.history.push(self.coloring.clone());
-                },
-                (Some(swap_color_res), None) => {
-                    best_score = swap_color_res.0;
-                    // self.coloring[u as usize] = swap_color_res.1;
-                    self.set_color(u as usize, swap_color_res.1);
-                    self.history.push(self.coloring.clone());
-                },
-                (None, Some(new_color_res)) => {
-                    best_score = new_color_res.0;
-                    // self.coloring[u as usize] = new_color_res.1;
-                    self.set_color(u as usize, new_color_res.1);
-                    self.number_of_colors += 1;
-                    self.history.push(self.coloring.clone());
-                },
-                (None, None) => {}
+                    incremented = true;
+                };
             }
         }
+
+        best_score
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::graph::Point;
+
+    fn create_testing_graph() -> Graph {
+        let mut graph = Graph::new();
+        graph.add_nodes((0..5).map(|_| Point::random()).collect());
+        graph.add_2d_edge(0, 1);
+        graph.add_2d_edge(0, 4);
+        graph.add_2d_edge(1, 3);
+        graph.add_2d_edge(1, 2);
+        graph.add_2d_edge(2, 4);
+        graph.add_2d_edge(2, 3);
+        graph.add_2d_edge(3, 4);
+        graph
+    }
 
     #[test]
-    fn test_graph_coloring() {
-        let mut graph = Graph::new();
-        graph.fill_with_random_points(10);
-        graph.fill_with_edges_stochastic(0.35);
+    fn test_graph_coloring_fast() {
+        let graph = create_testing_graph();
+        let graph_rc = Rc::new(graph);
+        let mut graph_coloring = GraphColoring::new(Rc::clone(&graph_rc), ScoreCalcTypeGraphColoring::Fast);
+        let score  = graph_coloring.graph_coloring();
+        let coloring = graph_coloring.coloring;
 
-        let graph = Rc::new(graph);
-        let mut graph_coloring = GraphColoring::new(Rc::clone(&graph), ScoreCalcType::Incremental);
-        graph_coloring.graph_coloring();
+        assert_eq!(coloring, vec![Color(1), Color(2), Color(1), Color(3), Color(2)], "Fast: coloring is incorrect");
+        assert_eq!(score, -9, "Fast: score is incorrect");
+    }
+
+    #[test]
+    fn test_graph_coloring_slow() {
+        let graph = create_testing_graph();
+        let graph_rc = Rc::new(graph);
+        let mut graph_coloring = GraphColoring::new(Rc::clone(&graph_rc), ScoreCalcTypeGraphColoring::Slow);
+        let score  = graph_coloring.graph_coloring();
+        let coloring = graph_coloring.coloring;
+
+        assert_eq!(coloring, vec![Color(1), Color(2), Color(1), Color(3), Color(2)], "Slow: coloring is incorrect");
+        assert_eq!(score, -9, "Slow: score is incorrect");
+    }
+
+    #[test]
+    fn test_graph_coloring_incremental() {
+        let graph = create_testing_graph();
+        let graph_rc = Rc::new(graph);
+        let mut graph_coloring = GraphColoring::new(Rc::clone(&graph_rc), ScoreCalcTypeGraphColoring::Incremental);
+        let score  = graph_coloring.graph_coloring();
+        let coloring = graph_coloring.coloring;
+
+        assert_eq!(coloring, vec![Color(1), Color(2), Color(1), Color(3), Color(2)], "Incremental: coloring is incorrect");
+        assert_eq!(score, -9, "Incremental: score is incorrect");
     }
 }
