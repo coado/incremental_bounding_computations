@@ -60,20 +60,7 @@ impl GraphColoring {
         }
     }
 
-    // fn calculate_score(&self) -> i32 {
-    //     let mut score = 0;
-
-    //     for color in 0..self.number_of_colors {
-    //         let number_of_nodes = self.colors_buckets[&Color(color)].len();
-    //         let number_of_violating_edges = self.violating_edges_buckets[&Color(color)].len();
-
-    //         score += number_of_nodes * (2 * number_of_violating_edges - number_of_nodes);
-    //     }
-
-    //     score as i32
-    // }
-
-    fn calculate_score_naive_slow(&self) -> i32 {
+    fn calculate_score_slow(&self) -> i32 {
         let mut score: i32 = 0;
 
         for color in 0..self.number_of_colors {
@@ -102,6 +89,7 @@ impl GraphColoring {
                 }
             }
 
+            illegal_edges /= 2;
             score += 2 * illegal_edges * amount;
         }
 
@@ -126,7 +114,7 @@ impl GraphColoring {
 
         for color in 0..self.number_of_colors {
             let number_of_nodes = colors_freq[color as usize];
-            let number_of_violating_edges = violating_edges_freq[color as usize];
+            let number_of_violating_edges = violating_edges_freq[color as usize] / 2;
 
             score += number_of_nodes * (2 * number_of_violating_edges - number_of_nodes);
         }
@@ -137,7 +125,7 @@ impl GraphColoring {
     fn calc_score(&mut self) -> i32 {
         let res = match &self.score_type {
             ScoreCalcTypeGraphColoring::Fast => self.calculate_score_naive(),
-            ScoreCalcTypeGraphColoring::Slow => self.calculate_score_naive_slow(),
+            ScoreCalcTypeGraphColoring::Slow => self.calculate_score_slow(),
             ScoreCalcTypeGraphColoring::Incremental => {
                 let comp = self.comp.as_mut().unwrap();
                 comp.get_result().unwrap()
@@ -176,6 +164,9 @@ impl GraphColoring {
             }
         }
 
+        if best_color != starting_color {
+            println!("Swap Color: vertex {} from {} to {} score: {}", vertex, starting_color.0, best_color.0, current_best_score);
+        }
 
         self.set_color(vertex as usize, best_color);
         current_best_score
@@ -192,6 +183,8 @@ impl GraphColoring {
         let score = self.calc_score();
         
         if score < best_score {
+            println!("New Color: vertex {} from {} to {} score: {}", vertex, starting_color.0, self.number_of_colors, score);
+
             self.number_of_colors += 1;
             return score;
         } else {
@@ -238,6 +231,60 @@ mod tests {
         graph.add_2d_edge(2, 3);
         graph.add_2d_edge(3, 4);
         graph
+    }
+
+    #[test]
+    fn test_calculate_score_naive() {
+        let graph = create_testing_graph();
+        let graph_rc = Rc::new(graph);
+        let mut graph_coloring = GraphColoring::new(Rc::clone(&graph_rc), ScoreCalcTypeGraphColoring::Fast);
+        let score = graph_coloring.calculate_score_naive();
+        assert_eq!(score, 45, "Calucalte Score Naive: Score is incorrect, should be 45");
+
+        graph_coloring.coloring[0] = Color(1);
+        graph_coloring.number_of_colors += 1;
+        let score = graph_coloring.calculate_score_naive();
+        assert_eq!(score, 23, "Calucalte Score Naive: Score is incorrect, should be 23");
+
+        graph_coloring.coloring[1] = Color(2);
+        graph_coloring.number_of_colors += 1;
+        let score = graph_coloring.calculate_score_naive();
+        assert_eq!(score, 7, "Calucalte Score Naive: Score is incorrect, should be 7");
+
+        graph_coloring.coloring[2] = Color(1);
+        let score = graph_coloring.calculate_score_naive();
+        assert_eq!(score, -5, "Calucalte Score Naive: Score is incorrect, should be -5");
+
+        graph_coloring.coloring[4] = Color(2);
+        let score = graph_coloring.calculate_score_naive();
+        assert_eq!(score, -9, "Calucalte Score Naive: Score is incorrect, should be -9");
+    }
+
+    #[test]
+    fn test_calculate_score_slow() {
+        let graph = create_testing_graph();
+        let graph_rc = Rc::new(graph);
+        let mut graph_coloring = GraphColoring::new(Rc::clone(&graph_rc), ScoreCalcTypeGraphColoring::Slow);
+        let score = graph_coloring.calculate_score_slow();
+        assert_eq!(score, 45, "Calucalte Score Naive: Score is incorrect, should be 45");
+
+        graph_coloring.coloring[0] = Color(1);
+        graph_coloring.number_of_colors += 1;
+        let score = graph_coloring.calculate_score_slow();
+        assert_eq!(score, 23, "Calucalte Score Naive: Score is incorrect, should be 23");
+
+        graph_coloring.coloring[1] = Color(2);
+        graph_coloring.number_of_colors += 1;
+        let score = graph_coloring.calculate_score_slow();
+        assert_eq!(score, 7, "Calucalte Score Naive: Score is incorrect, should be 7");
+
+        graph_coloring.coloring[2] = Color(1);
+        let score = graph_coloring.calculate_score_slow();
+        assert_eq!(score, -5, "Calucalte Score Naive: Score is incorrect, should be -5");
+
+        graph_coloring.coloring[4] = Color(2);
+        let score = graph_coloring.calculate_score_slow();
+        assert_eq!(score, -9, "Calucalte Score Naive: Score is incorrect, should be -9");
     }
 
     #[test]

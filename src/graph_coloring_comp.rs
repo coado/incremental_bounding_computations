@@ -131,7 +131,9 @@ impl GraphColoringComp {
                 let computation = thunk![{
                     let invalid_edges = get!(invalid_edges);
                     let vertecies_of_color = get!(vertecies_of_color);
-                    2 * vertecies_of_color * invalid_edges + vertecies_of_color.pow(2)
+                    let res = 2 * vertecies_of_color * invalid_edges - vertecies_of_color.pow(2);
+                    println!("Color: {}, Invalid edges: {}, Vertecies of color: {}, Result: {}", c, invalid_edges, vertecies_of_color, res);
+                    res
                 }];
 
                 computation
@@ -165,7 +167,7 @@ mod tests {
     use crate::graph::Point;
 
     use super::*;
-    use std::sync::Once;
+    use std::{result, sync::Once};
 
     fn lazy_init_static_al() -> &'static Vec<Vec<i32>> {
         static mut AL: *const Vec<Vec<i32>> = std::ptr::null();
@@ -240,23 +242,23 @@ mod tests {
 
         let result = graph_coloring_comp.get_result();
 
-        // 16 + 2 * 4 * 4 = 48
-        // vertecies_of_color**2 + 2 * vertecies_of_color * invalid_edges
-        assert_eq!(result, Some(48), "Result should be 48");
+        // 2 * 4 * 4 - 16 = 16
+        // -vertecies_of_color**2 + 2 * vertecies_of_color * invalid_edges
+        assert_eq!(result, Some(16), "Result should be 16");
         graph_coloring_comp.update_input_node(0, 1);
         let result = graph_coloring_comp.get_result();
 
-        // 0: 9 + 2 * 3 * 2 = 21
-        // 1: 1 + 2 * 1 * 0 = 1
-        // 22 
-        assert_eq!(result, Some(22), "Result should be 22");
+        // 0: -9 + 2 * 3 * 2 = 3
+        // 1: -1 + 2 * 1 * 0 = -1
+        // 2 
+        assert_eq!(result, Some(2), "Result should be 2");
         graph_coloring_comp.update_input_node(1, 1);
         let result = graph_coloring_comp.get_result();
 
-        // 0: 4 + 2 * 2 * 0 = 4
-        // 1: 4 + 2 * 2 * 0 = 4
-        // 8
-        assert_eq!(result, Some(8), "Result should be 8");
+        // 0: -4 + 2 * 2 * 0 = -4
+        // 1: -4 + 2 * 2 * 0 = -4
+        // -8
+        assert_eq!(result, Some(-8), "Result should be -8");
 
         graph_coloring_comp.seal();
         
@@ -310,5 +312,43 @@ mod tests {
 
         assert_eq!(invalid_edges, vec![0, 0, 0, 0], "Invalid edges should be [0, 0, 0, 0]");
         
+    }
+
+    #[test]
+    fn test_new_color() {
+        let mut graph = Graph::new();
+        graph.add_nodes((0..5).map(|_| Point::random()).collect());
+        graph.add_2d_edge(0, 1);
+        graph.add_2d_edge(0, 4);
+        graph.add_2d_edge(1, 3);
+        graph.add_2d_edge(1, 2);
+        graph.add_2d_edge(2, 4);
+        graph.add_2d_edge(2, 3);
+        graph.add_2d_edge(3, 4);
+
+        let graph_rc = Rc::new(graph);
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 5);
+        graph_coloring_comp.create_computation_graph();
+        let result = graph_coloring_comp.get_result();
+
+        assert_eq!(result, Some(45), "Result should be 45");
+
+        graph_coloring_comp.update_input_node(0, 1);
+        let result = graph_coloring_comp.get_result();
+        assert_eq!(result, Some(23), "Result should be 23");
+
+        graph_coloring_comp.update_input_node(1, 2);
+        let result = graph_coloring_comp.get_result();
+        assert_eq!(result, Some(7), "Result should be 7");
+
+        graph_coloring_comp.update_input_node(2, 1);
+        let result = graph_coloring_comp.get_result();
+        assert_eq!(result, Some(-5), "Result should be -5");
+
+        graph_coloring_comp.update_input_node(4, 2);
+        let result = graph_coloring_comp.get_result();
+        assert_eq!(result, Some(-9), "Result should be -9");
+
+
     }
 }
