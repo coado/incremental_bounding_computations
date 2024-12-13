@@ -23,8 +23,12 @@ path = "src/lib.rs"
 # name = "adapton_benchmark"
 # harness = false
 
+# [[bench]]
+# name = "tsp_benchmark"
+# harness = false
+
 [[bench]]
-name = "tsp_benchmark"
+name = "firewall_benchmark"
 harness = false
 
 # [[bench]]
