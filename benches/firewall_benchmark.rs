@@ -1,11 +1,10 @@
 extern crate incremental_computations;
 #[macro_use] extern crate adapton;
 
-use criterion::{criterion_group, criterion_main, Criterion, black_box, BenchmarkId};
+use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 
 use adapton::macros::*;
 use adapton::engine::*;
-use adapton::reflect;
 
 enum GraphType {
     Classic,
@@ -91,7 +90,7 @@ fn firewall_benchmark(c: &mut Criterion) {
     for n in [5, 10, 20, 50, 100].iter() {
         group.bench_with_input(BenchmarkId::new("Classic", n), n, |b, &n| {
             let mut graph = FirewallGraph::new(n, GraphType::Classic);
-            let res = graph.get_root();
+            graph.get_root();
             let mut values = Vec::new();
             for i in 0..n {
                 values.push(i as i32);
@@ -108,7 +107,7 @@ fn firewall_benchmark(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("Firewall", n), n, |b, &n| {
             let mut graph = FirewallGraph::new(n, GraphType::Firewall);
-            let res = graph.get_root();
+            graph.get_root();
             let mut values = Vec::new();
             for i in 0..n {
                 values.push(i as i32);

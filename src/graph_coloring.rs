@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use crate::graph::{Graph, PointId};
-use crate::graph_coloring_comp::GraphColoringComp;
+use crate::graph_coloring_comp::{GraphColoringComp, GraphColouringFlags};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Color(pub i32);
@@ -41,7 +41,10 @@ impl GraphColoring {
 
         let comp = match &score_type {
             ScoreCalcTypeGraphColoring::Incremental => {
-                let mut comp = GraphColoringComp::new(Rc::clone(&graph), number_of_nodes as usize);
+                let mut comp = GraphColoringComp::new(
+                    Rc::clone(&graph), 
+                    number_of_nodes as usize, 
+                    GraphColouringFlags::new(true, true, true));
                 comp.create_computation_graph();
                 comp.get_result();
                 Some(comp)
@@ -136,7 +139,6 @@ impl GraphColoring {
     }
 
     fn set_color(&mut self, v: usize, color: Color) {
-        
         match &mut self.score_type {
             ScoreCalcTypeGraphColoring::Incremental => {
                 let comp = self.comp.as_mut().unwrap();

@@ -27,9 +27,9 @@ path = "src/lib.rs"
 # name = "tsp_benchmark"
 # harness = false
 
-[[bench]]
-name = "firewall_benchmark"
-harness = false
+# [[bench]]
+# name = "firewall_benchmark"
+# harness = false
 
 [[bench]]
 name = "graph_coloring_benchmark"

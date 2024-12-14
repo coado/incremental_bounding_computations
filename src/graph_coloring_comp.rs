@@ -5,25 +5,63 @@ use adapton::reflect;
 use crate::diagnostics::Diagnostics;
 use crate::graph::Graph;
 
+#[derive(Debug, Default)]
+pub struct GraphColouringFlags {
+    pub enable_firewall: bool,
+    pub enable_dynamic_branches: bool,
+    pub merge_computation_layers: bool,
+}
+
+#[derive(Debug, Clone)]
+enum Guards {
+    Normal(Vec<Art<bool>>),
+    Firewall(Vec<Art<Art<bool>>>)
+}
+
+impl Guards {
+    fn len(&self) -> usize {
+        match self {
+            Guards::Normal(guards) => guards.len(),
+            Guards::Firewall(guards) => guards.len()
+        }
+    }
+}
+
+impl GraphColouringFlags {
+    pub fn new(enable_firewall: bool, enable_dynamic_branches: bool, merge_computation_layers: bool) -> GraphColouringFlags {
+        GraphColouringFlags {
+            enable_firewall,
+            enable_dynamic_branches,
+            merge_computation_layers
+        }
+    }
+
+    pub fn default() -> GraphColouringFlags {
+        GraphColouringFlags {
+            enable_firewall: false,
+            enable_dynamic_branches: false,
+            merge_computation_layers: false
+        }
+    }
+}
+
 pub struct GraphColoringComp {
     input_nodes_layer: Vec<Art<i32>>,
-    granular_guards_layer: Vec<Vec<Art<bool>>>,
-    guards_layer: Vec<Art<i32>>,
-    computations_layer: Vec<Art<i32>>,
-    invalid_edges_layer: Vec<Art<i32>>,
+    computation_nodes_layer: Vec<Art<i32>>,
     result: Option<Art<i32>>,
     sealed: bool,
-    number_of_colors: i32,
+    max_number_of_colours: i32,
+    used_colours: usize,
     diagnostics: Option<Diagnostics>,
-    graph: Rc<Graph>
+    graph: Rc<Graph>,
+    flags: GraphColouringFlags
 }
 
 impl GraphColoringComp {
-    pub fn new(graph: Rc<Graph>, n: usize) -> GraphColoringComp {
+    pub fn new(graph: Rc<Graph>, n: usize, flags: GraphColouringFlags) -> GraphColoringComp {
         manage::init_dcg();
 
         if cfg!(feature = "traces") {
-            println!("GraphColoringComp: traces enabled");
             reflect::dcg_reflect_begin();
         }
 
@@ -33,15 +71,14 @@ impl GraphColoringComp {
         
         GraphColoringComp {
             input_nodes_layer,
-            guards_layer: Vec::new(),
-            granular_guards_layer: Vec::new(),
-            computations_layer: Vec::new(),
-            invalid_edges_layer: Vec::new(),
+            computation_nodes_layer: Vec::new(),
             result: None,
             sealed: false,
-            number_of_colors: n as i32,
+            max_number_of_colours: n as i32,
+            used_colours: 1,
             diagnostics: None,
-            graph
+            graph,
+            flags
         }
     }
 
@@ -57,58 +94,176 @@ impl GraphColoringComp {
     }
 
     pub fn update_input_node(&mut self, idx: usize, val: i32) {
+        assert!(val < self.max_number_of_colours, "Invalid colour");
         self.ensure_unsealed();
+        
+        if val == self.used_colours as i32 {
+            if self.flags.enable_dynamic_branches {
+                self.update_root_with_new_colour(val);
+            }
+            self.used_colours += 1;
+        }
+
         set(&self.input_nodes_layer[idx], val);
     }
 
     pub fn create_computation_graph(&mut self) {
-        self.create_guards_layer();
-        self.create_invalid_edges_layer();
-        self.create_computation_layer();
-        self.create_final_layer();    
+        let root_node = self.create_root_node();
+        self.result = Some(root_node);
     }
 
-    fn ensure_unsealed(&mut self) {
-        assert!(!self.sealed, "Graph Coloring is sealed");
+    fn update_root_with_new_colour(&mut self, colour: i32) {
+        let computation_node = self.create_branch(colour);
+        self.computation_nodes_layer.push(computation_node);
+        let root_node = self.create_final_layer();
+        self.result = Some(root_node);
     }
 
-    fn create_guards_layer(&mut self) {
-        let guards_layer = (0..self.number_of_colors)
-            .map(|c| {
-                let guards = self.input_nodes_layer.iter().map(|input_node| {
-                    let input_node_clone = input_node.clone();
-                    thunk!(get!(input_node_clone) == c)
-                    // thunk!({
-                    //     let x = get!(input_node_clone);
-                    //     cell!(x == c)
-                    // })
-                }).collect::<Vec<Art<bool>>>();
-                self.granular_guards_layer.push(guards.clone());
-                let t = thunk![{
-                    let x = guards.iter().fold(0, |acc, guard| {
-                        // let is_active = force(&guard);
-                        acc + i32::from(get!(guard))
-                    });
-                    x
-                }];
-                t
-            }).collect::<Vec<Art<i32>>>();
+    fn create_root_node(&mut self) -> Art<i32> {
+        let mut computation_layer = Vec::new();
+        match self.flags.enable_dynamic_branches {
+            true => {
+                // at this point we have only one colour
+                let computation_node = self.create_branch(0);
+                computation_layer.push(computation_node);
+            },
+            false => {
+                for i in 0..self.max_number_of_colours {
+                    computation_layer.push(self.create_branch(i));
+                };
+            }
+        };
         
-        self.guards_layer = guards_layer;
+        self.computation_nodes_layer = computation_layer;
+        self.create_final_layer()
     }
 
-    fn create_invalid_edges_layer(&mut self) {
-        let invalid_edges_layer = self.granular_guards_layer
-            .iter()
-            .enumerate()
-            .map(|(c, granular_guards)| {
+    fn create_branch(&self, colour: i32) -> Art<i32> {
+        let guards_layer = self.create_guards_layer(colour);
+        let computation_layer_node = self.create_computation_layer(&guards_layer);
+        computation_layer_node
+    }
+
+    fn create_guards_layer(&self, colour: i32) -> Guards {
+        match self.flags.enable_firewall {
+            true => {
+                let guards_layer = self.input_nodes_layer.iter().map(|input_node| {
+                    let input_node_clone = input_node.clone();
+                    thunk!({
+                        let val = get!(input_node_clone);
+                        cell!(val == colour)
+                    })
+                }).collect::<Vec<Art<Art<bool>>>>();
+
+                Guards::Firewall(guards_layer)
+            },
+            false => {
+                let guards_layer = self.input_nodes_layer.iter().map(|input_node| {
+                    let input_node_clone = input_node.clone();
+                    thunk!(get!(input_node_clone) == colour)
+                }).collect::<Vec<Art<bool>>>();
+
+                Guards::Normal(guards_layer)
+            }
+        }
+    }
+
+    fn create_computation_layer(&self, guards_layer: &Guards) -> Art<i32> {
+        match self.flags.merge_computation_layers {
+            true => {
                 let graph_rc = Rc::clone(&self.graph);
-                let granular_guards_clone = granular_guards.clone();
-                let invalid_edges_thunk_res = thunk![{
+
+                match guards_layer {
+                    Guards::Normal(guards_layer) => {
+                        let guards_layer_clone = guards_layer.clone();
+                        thunk!({
+                            let mut nodes: Vec<usize> = Vec::new();
+                            for (i, g) in guards_layer_clone.iter().enumerate() {
+                                // let is_active = force(&g);
+                                if get!(g) {
+                                    // push if node is in active state for this colour
+                                    nodes.push(i);
+                                }
+                            }
+                            
+                            let mut invalid_edges = 0 as i32;
+                            for i in 0..nodes.len() {
+                                for j in i+1..nodes.len() {
+                                    let edge = graph_rc.get_edge_from_lookup(nodes[i] as i32, nodes[j] as i32);
+                                    match edge {
+                                        Some(_) => invalid_edges += 1,
+                                        None => ()
+                                    }
+                                }
+                            }
+        
+                            let vertices_of_colour = nodes.len() as i32;
+                            let result = 2 * vertices_of_colour * invalid_edges - vertices_of_colour.pow(2);
+                            result as i32
+                        })
+                    },
+                    Guards::Firewall(guards_layer) => {
+                        let guards_layer_clone = guards_layer.clone();
+                        thunk!({
+                            let mut nodes: Vec<usize> = Vec::new();
+                            for (i, g) in guards_layer_clone.iter().enumerate() {
+                                let is_active = force(&g);
+                                if get!(is_active) {
+                                    // push if node is in active state for this colour
+                                    nodes.push(i);
+                                }
+                            }
+                            
+                            let mut invalid_edges = 0 as i32;
+                            for i in 0..nodes.len() {
+                                for j in i+1..nodes.len() {
+                                    let edge = graph_rc.get_edge_from_lookup(nodes[i] as i32, nodes[j] as i32);
+                                    match edge {
+                                        Some(_) => invalid_edges += 1,
+                                        None => ()
+                                    }
+                                }
+                            }
+        
+                            let vertices_of_colour = nodes.len() as i32;
+                            let result = 2 * vertices_of_colour * invalid_edges - vertices_of_colour.pow(2);
+                            result as i32
+                        })
+                    }
+                }
+            },
+            false => {
+                let invalid_edges_node = self.create_invalid_edges_node(guards_layer);
+                let summing_node = self.create_summing_node(guards_layer);
+                thunk!(2 * get!(summing_node) * get!(invalid_edges_node) - get!(summing_node).pow(2))
+            }
+        }
+    }
+
+    fn create_final_layer(&self) -> Art<i32> {
+        let computation_nodes_layer_clone = self.computation_nodes_layer.clone();
+        let root_node = thunk!({
+            computation_nodes_layer_clone.iter().fold(0, |acc, node| {
+                let node_clone = node.clone();
+                acc + i32::from(get!(node_clone))
+            })
+        });
+
+        root_node
+    }
+
+    fn create_invalid_edges_node(&self, guards_layer: &Guards) -> Art<i32> {
+        let graph_rc = Rc::clone(&self.graph);
+
+        match guards_layer {
+            Guards::Normal(guards_layer) => {
+                let guards_layer_clone = guards_layer.clone();
+                thunk![{
                     let mut nodes: Vec<usize> = Vec::new();
-                    for (i, g) in granular_guards_clone.iter().enumerate() {
+                    for (i, g) in guards_layer_clone.iter().enumerate() {
                         // let is_active = force(&g);
                         if get!(g) {
+                            // push if node is in active state for this colour
                             nodes.push(i);
                         }
                     }
@@ -125,51 +280,62 @@ impl GraphColoringComp {
                     }
 
                     invalid_edges
-                }];
+                }]
+            },
+            Guards::Firewall(guards_layer) => {
+                let guards_layer_clone = guards_layer.clone();
+                thunk![{
+                    let mut nodes: Vec<usize> = Vec::new();
+                    for (i, g) in guards_layer_clone.iter().enumerate() {
+                        let is_active = force(&g);
+                        if get!(is_active) {
+                            // push if node is in active state for this colour
+                            nodes.push(i);
+                        }
+                    }
+                    
+                    let mut invalid_edges = 0;
+                    for i in 0..nodes.len() {
+                        for j in i+1..nodes.len() {
+                            let edge = graph_rc.get_edge_from_lookup(nodes[i] as i32, nodes[j] as i32);
+                            match edge {
+                                Some(_) => invalid_edges += 1,
+                                None => ()
+                            }
+                        }
+                    }
 
-                invalid_edges_thunk_res
-            }).collect::<Vec<Art<i32>>>();
-
-        self.invalid_edges_layer = invalid_edges_layer;
+                    invalid_edges
+                }]
+            }
+        }
     }
 
-    fn create_computation_layer(&mut self) {
-        let computations_layer = (0..self.number_of_colors)
-            .map(|c| {
-                let invalid_edges = self.invalid_edges_layer[c as usize].clone();
-                let vertecies_of_color = self.guards_layer[c as usize].clone();
+    fn create_summing_node(&self, guards_layer: &Guards) -> Art<i32> {
 
-                let computation = thunk![{
-                    let invalid_edges = get!(invalid_edges);
-                    let vertecies_of_color = get!(vertecies_of_color);
-                    let res = 2 * vertecies_of_color * invalid_edges - vertecies_of_color.pow(2);
-                    // println!("Color: {}, Invalid edges: {}, Vertecies of color: {}, Result: {}", c, invalid_edges, vertecies_of_color, res);
-                    res
-                }];
-
-                computation
-            }).collect::<Vec<Art<i32>>>();
-
-
-        self.computations_layer = computations_layer;
-    }
-
-    fn create_final_layer(&mut self) -> &Art<i32> {
-       let layer = self.computations_layer.clone();
-        
-        let res = thunk!(
-            layer.iter().fold(0, |acc, node| {
-                let node_clone = node.clone();
-                acc + i32::from(get!(node_clone))
-            })
-        );
-
-        self.result = Some(res);
-        self.result.as_ref().unwrap()
+        match guards_layer {
+            Guards::Normal(guards_layer) => {
+                let guards_layer_clone = guards_layer.clone();
+                thunk!(guards_layer_clone.iter().fold(0, |acc, guard| {
+                    acc + i32::from(get!(&guard))
+                }))
+            },
+            Guards::Firewall(guards_layer) => {
+                let guards_layer_clone = guards_layer.clone();
+                thunk!(guards_layer_clone.iter().fold(0, |acc, guard| {
+                    let is_active = force(&guard);
+                    acc + i32::from(get!(&is_active))
+                }))
+            }
+        }
     }
 
     pub fn get_result(&self) -> Option<i32> {
        self.result.as_ref().and_then(|res| Some(i32::from(get!(res))))
+    }
+
+    fn ensure_unsealed(&mut self) {
+        assert!(!self.sealed, "Graph Coloring is sealed");
     }
 }
 
@@ -199,47 +365,7 @@ mod tests {
         unsafe { &*AL }
     }
 
-    #[test]
-    fn test_guards_layer() {
-        let mut graph_coloring_comp = GraphColoringComp::new(Rc::new(Graph::default()), 3);
-        graph_coloring_comp.create_guards_layer();
-        
-        assert!(graph_coloring_comp.guards_layer.len() == 3, "Guards layer should have 3 guards");
-
-        for i in 0..graph_coloring_comp.guards_layer.len() {
-            graph_coloring_comp.update_input_node(i, i as i32);
-        }
-
-        for i in 0..graph_coloring_comp.guards_layer.len() {
-            assert_eq!(get!(graph_coloring_comp.guards_layer[i]), 1);
-        }
-    }
-
-    #[test]
-    fn test_diagnostics() {
-        let mut graph_coloring_comp = GraphColoringComp::new(Rc::new(Graph::default()), 3);
-        graph_coloring_comp.create_guards_layer();
-        assert!(graph_coloring_comp.guards_layer.len() == 3, "Guards layer should have 3 guards");
-
-        get!(graph_coloring_comp.guards_layer[0]);
-        get!(graph_coloring_comp.guards_layer[1]);
-        get!(graph_coloring_comp.guards_layer[2]);
-        graph_coloring_comp.update_input_node(1, 1);
-        get!(graph_coloring_comp.guards_layer[0]);
-        get!(graph_coloring_comp.guards_layer[1]);
-        get!(graph_coloring_comp.guards_layer[2]);
-
-        graph_coloring_comp.seal();
-        let diagnostics = graph_coloring_comp.diagnostics;
-        
-        if let Some(diag) = diagnostics {
-            assert!(diag.cells_count == 3, "Cells count should be 3");
-            assert!(diag.thunks_count == 12, "Thunks count should be 12");
-        }
-    }
-
-    #[test]
-    fn test_computation_layer() {
+    fn make_result_tests(flags: GraphColouringFlags) -> GraphColoringComp {
         let mut graph = Graph::new();
         graph.add_nodes((0..4).map(|_| Point::random()).collect());
         graph.add_2d_edge(0, 2);
@@ -248,7 +374,7 @@ mod tests {
         graph.add_2d_edge(1, 3);
 
         let graph_rc = Rc::new(graph);
-        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 4);
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 4, flags);
         graph_coloring_comp.create_computation_graph();
 
         let result = graph_coloring_comp.get_result();
@@ -256,6 +382,7 @@ mod tests {
         // 2 * 4 * 4 - 16 = 16
         // -vertecies_of_color**2 + 2 * vertecies_of_color * invalid_edges
         assert_eq!(result, Some(16), "Result should be 16");
+        assert_eq!(graph_coloring_comp.used_colours, 1, "Used colours should be 1");
         graph_coloring_comp.update_input_node(0, 1);
         let result = graph_coloring_comp.get_result();
 
@@ -263,6 +390,7 @@ mod tests {
         // 1: -1 + 2 * 1 * 0 = -1
         // 2 
         assert_eq!(result, Some(2), "Result should be 2");
+        assert_eq!(graph_coloring_comp.used_colours, 2, "Used colours should be 2");
         graph_coloring_comp.update_input_node(1, 1);
         let result = graph_coloring_comp.get_result();
 
@@ -271,8 +399,85 @@ mod tests {
         // -8
         assert_eq!(result, Some(-8), "Result should be -8");
 
-        graph_coloring_comp.seal();
+        graph_coloring_comp
+    }
+
+    #[test]
+    fn test_guards_layer() {
+        let n = 3;
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::new(Graph::default()), n, GraphColouringFlags::default());
         
+        let guards_layer_zero: Guards = graph_coloring_comp.create_guards_layer(0);
+        let guards_layer_one = graph_coloring_comp.create_guards_layer(1);
+        let guards_layer_two = graph_coloring_comp.create_guards_layer(2);
+        
+        assert!(guards_layer_zero.len() == 3, "Guards layer should have 3 guards");
+        assert!(guards_layer_one.len() == 3, "Guards layer should have 3 guards");
+        assert!(guards_layer_two.len() == 3, "Guards layer should have 3 guards");
+
+        let guards_layer_zero_clone = guards_layer_zero.clone();
+        let guards_layer_one_clone = guards_layer_one.clone();
+        let guards_layer_two_clone = guards_layer_two.clone();
+
+        for i in 0..n {
+            if let Guards::Normal(guards) = &guards_layer_zero_clone {
+                assert_eq!(get!(guards[i]), true);
+            }
+            if let Guards::Normal(guards) = &guards_layer_one_clone {
+                assert_eq!(get!(guards[i]), false);
+            }
+            if let Guards::Normal(guards) = &guards_layer_two_clone {
+                assert_eq!(get!(guards[i]), false);
+            }
+        }
+
+        graph_coloring_comp.update_input_node(1, 1);
+        graph_coloring_comp.update_input_node(2, 2);
+
+        for i in 0..n {
+            if let Guards::Normal(guards) = &guards_layer_zero_clone {
+                assert_eq!(get!(guards[i]), i == 0);
+            }
+            if let Guards::Normal(guards) = &guards_layer_one_clone {
+                assert_eq!(get!(guards[i]), i == 1);
+            }
+            if let Guards::Normal(guards) = &guards_layer_two_clone {
+                assert_eq!(get!(guards[i]), i == 2);
+            }
+        }
+    }
+
+    #[test]
+    fn test_diagnostics() {
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::new(Graph::default()), 3, GraphColouringFlags::default());
+        let guards_layer = graph_coloring_comp.create_guards_layer(0);
+        assert!(guards_layer.len() == 3, "Guards layer should have 3 guards");
+
+        if let Guards::Normal(guards) = &guards_layer {
+            get!(guards[0]);
+            get!(guards[1]);
+            get!(guards[2]);
+        }
+        graph_coloring_comp.update_input_node(0, 1);
+        if let Guards::Normal(guards) = &guards_layer {
+            get!(guards[0]);
+            get!(guards[1]);
+            get!(guards[2]);
+        }
+        graph_coloring_comp.seal();
+        let diagnostics = graph_coloring_comp.diagnostics;
+        
+        if let Some(diag) = diagnostics {
+            assert!(diag.cells_count == 3, "Cells count should be 3");
+            assert!(diag.thunks_count == 3, "Thunks count should be 12");
+        }
+    }
+
+    #[test]
+    fn test_computation_graph_default_flags() {
+        let mut graph_coloring_comp = make_result_tests(GraphColouringFlags::default());
+
+        graph_coloring_comp.seal();
         if let Some(diag) = graph_coloring_comp.diagnostics {
             assert_eq!(diag.cells_count, 4, "Cells count should be 4");
 
@@ -287,6 +492,68 @@ mod tests {
     }
 
     #[test]
+    fn test_computation_graph_merge_layers_flag() {
+        let mut graph_coloring_comp = make_result_tests(GraphColouringFlags::new(false, false, true));
+
+        graph_coloring_comp.seal();
+        if let Some(diag) = graph_coloring_comp.diagnostics {
+            assert_eq!(diag.cells_count, 4, "Cells count should be 4");
+
+            // granular_layer: 16
+            // computations_layer: 4
+            // final_layer: 1
+            // total: 21
+            assert_eq!(diag.thunks_count, 21, "Thunks count should be 21");
+        }
+    }
+
+    #[test]
+    fn test_computation_graph_dynamic_branches_flag() {
+        let mut graph_coloring_comp = make_result_tests(GraphColouringFlags::new(false, true, false));
+
+        graph_coloring_comp.seal();
+        if let Some(diag) = graph_coloring_comp.diagnostics {
+            assert_eq!(diag.cells_count, 4, "Cells count should be 4");
+
+            // guards_layer: 8
+            // invalid_edges_layer: 2
+            // summing_layer: 2
+            // computations_layer: 2
+            // previous final_layer: 1
+            // final_layer: 1
+            // total: 16
+            // for now it will duplicate final layers each time the new colour is added
+            // but we will only use the most recent one to calculate the result
+            assert_eq!(diag.thunks_count, 16, "Thunks count should be 16");
+        }
+    }
+
+    #[test]
+    fn test_computation_graph_enable_firewall_flag() {
+        make_result_tests(GraphColouringFlags::new(true, false, false));
+    }
+
+    #[test]
+    fn test_computation_graph_enable_firewall_and_dynamic_branches_flag() {
+        make_result_tests(GraphColouringFlags::new(true, true, false));
+    }
+
+    #[test]
+    fn test_computation_graph_enable_firewall_and_merge_computations_flag() {
+        make_result_tests(GraphColouringFlags::new(true, false, true));
+    }
+
+    #[test]
+    fn test_computation_graph_enable_dynamic_branches_and_merge_computations_flag() {
+        make_result_tests(GraphColouringFlags::new(false, true, true));
+    }
+
+    #[test]
+    fn test_computation_graph_enable_all_flags() {
+        make_result_tests(GraphColouringFlags::new(true, true, true));
+    }
+
+    #[test]
     fn test_invalid_edges_layer() {
         let mut graph = Graph::new();
         graph.add_nodes((0..4).map(|_| Point::random()).collect());
@@ -296,30 +563,46 @@ mod tests {
         graph.add_2d_edge(1, 3);
 
         let graph_rc = Rc::new(graph);
-        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 4);
-        graph_coloring_comp.create_guards_layer();
-        graph_coloring_comp.create_invalid_edges_layer();
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 4, GraphColouringFlags::default());
+        
+        let guards_layer_zero = graph_coloring_comp.create_guards_layer(0);
+        let guards_layer_one = graph_coloring_comp.create_guards_layer(1);
+        let guards_layer_two = graph_coloring_comp.create_guards_layer(2);
+        let guards_layer_three = graph_coloring_comp.create_guards_layer(3);
 
-        let invalid_edges_layer = graph_coloring_comp.invalid_edges_layer.clone();
-        let invalid_edges = invalid_edges_layer.iter().map(|invalid_edges| {
-            get!(invalid_edges)
-        }).collect::<Vec<i32>>();
+        let invalid_edges_node_zero = graph_coloring_comp.create_invalid_edges_node(&guards_layer_zero);
+        let invalid_edges_node_one = graph_coloring_comp.create_invalid_edges_node(&guards_layer_one);
+        let invalid_edges_node_two = graph_coloring_comp.create_invalid_edges_node(&guards_layer_two);
+        let invalid_edges_node_three = graph_coloring_comp.create_invalid_edges_node(&guards_layer_three);
+
+        let invalid_edges = vec![
+            get!(invalid_edges_node_zero),
+            get!(invalid_edges_node_one),
+            get!(invalid_edges_node_two),
+            get!(invalid_edges_node_three)
+        ];
 
         assert_eq!(invalid_edges, vec![4, 0, 0, 0], "Invalid edges should be [4, 0, 0, 0]");
 
         graph_coloring_comp.update_input_node(0, 1);
 
-        let invalid_edges = invalid_edges_layer.iter().map(|invalid_edges| {
-            get!(invalid_edges)
-        }).collect::<Vec<i32>>();
+        let invalid_edges = vec![
+            get!(invalid_edges_node_zero),
+            get!(invalid_edges_node_one),
+            get!(invalid_edges_node_two),
+            get!(invalid_edges_node_three)
+        ];
 
         assert_eq!(invalid_edges, vec![2, 0, 0, 0], "Invalid edges should be [2, 0, 0, 0]");
 
         graph_coloring_comp.update_input_node(1, 1);
 
-        let invalid_edges = invalid_edges_layer.iter().map(|invalid_edges| {
-            get!(invalid_edges)
-        }).collect::<Vec<i32>>();
+        let invalid_edges = vec![
+            get!(invalid_edges_node_zero),
+            get!(invalid_edges_node_one),
+            get!(invalid_edges_node_two),
+            get!(invalid_edges_node_three)
+        ];
 
         assert_eq!(invalid_edges, vec![0, 0, 0, 0], "Invalid edges should be [0, 0, 0, 0]");
         
@@ -338,7 +621,7 @@ mod tests {
         graph.add_2d_edge(3, 4);
 
         let graph_rc = Rc::new(graph);
-        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 5);
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 5, GraphColouringFlags::default());
         graph_coloring_comp.create_computation_graph();
         let result = graph_coloring_comp.get_result();
 
@@ -359,7 +642,5 @@ mod tests {
         graph_coloring_comp.update_input_node(4, 2);
         let result = graph_coloring_comp.get_result();
         assert_eq!(result, Some(-9), "Result should be -9");
-
-
     }
 }
