@@ -18,7 +18,7 @@ fn graph_coloring_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("graph_coloring_benchmark");
     group.sample_size(20);
     for n in [10, 20, 50, 100].iter() {
-        group.bench_with_input(BenchmarkId::new("Naive", n), n, |b, &n| {
+        group.bench_with_input(BenchmarkId::new("Fast", n), n, |b, &n| {
             b.iter(|| {
                 run_graph_coloring(n, ScoreCalcTypeGraphColoring::Fast);
             });

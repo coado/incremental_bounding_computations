@@ -78,11 +78,21 @@ impl GraphColoringComp {
                 let guards = self.input_nodes_layer.iter().map(|input_node| {
                     let input_node_clone = input_node.clone();
                     thunk!(get!(input_node_clone) == c)
+                    // thunk!({
+                    //     let x = get!(input_node_clone);
+                    //     cell!(x == c)
+                    // })
                 }).collect::<Vec<Art<bool>>>();
                 self.granular_guards_layer.push(guards.clone());
-                thunk!(guards.iter().fold(0, |acc, guard| acc + i32::from(get!(guard))))
-            })
-            .collect::<Vec<Art<i32>>>();
+                let t = thunk![{
+                    let x = guards.iter().fold(0, |acc, guard| {
+                        // let is_active = force(&guard);
+                        acc + i32::from(get!(guard))
+                    });
+                    x
+                }];
+                t
+            }).collect::<Vec<Art<i32>>>();
         
         self.guards_layer = guards_layer;
     }
@@ -97,6 +107,7 @@ impl GraphColoringComp {
                 let invalid_edges_thunk_res = thunk![{
                     let mut nodes: Vec<usize> = Vec::new();
                     for (i, g) in granular_guards_clone.iter().enumerate() {
+                        // let is_active = force(&g);
                         if get!(g) {
                             nodes.push(i);
                         }
@@ -132,7 +143,7 @@ impl GraphColoringComp {
                     let invalid_edges = get!(invalid_edges);
                     let vertecies_of_color = get!(vertecies_of_color);
                     let res = 2 * vertecies_of_color * invalid_edges - vertecies_of_color.pow(2);
-                    println!("Color: {}, Invalid edges: {}, Vertecies of color: {}, Result: {}", c, invalid_edges, vertecies_of_color, res);
+                    // println!("Color: {}, Invalid edges: {}, Vertecies of color: {}, Result: {}", c, invalid_edges, vertecies_of_color, res);
                     res
                 }];
 

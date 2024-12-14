@@ -1,7 +1,7 @@
 use adapton::reflect::trace::*;
 
 #[derive(Debug, Clone)]
-struct ActualTraceCount(TraceCount);
+pub struct ActualTraceCount(TraceCount);
 
 impl Default for ActualTraceCount {
     fn default() -> Self {

@@ -164,10 +164,6 @@ impl GraphColoring {
             }
         }
 
-        if best_color != starting_color {
-            println!("Swap Color: vertex {} from {} to {} score: {}", vertex, starting_color.0, best_color.0, current_best_score);
-        }
-
         self.set_color(vertex as usize, best_color);
         current_best_score
     }
@@ -183,8 +179,6 @@ impl GraphColoring {
         let score = self.calc_score();
         
         if score < best_score {
-            println!("New Color: vertex {} from {} to {} score: {}", vertex, starting_color.0, self.number_of_colors, score);
-
             self.number_of_colors += 1;
             return score;
         } else {

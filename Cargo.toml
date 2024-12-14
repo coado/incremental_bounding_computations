@@ -31,6 +31,6 @@ path = "src/lib.rs"
 name = "firewall_benchmark"
 harness = false
 
-# [[bench]]
-# name = "graph_coloring_benchmark"
-# harness = false
+[[bench]]
+name = "graph_coloring_benchmark"
+harness = false

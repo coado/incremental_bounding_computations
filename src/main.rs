@@ -7,6 +7,7 @@ mod graph_coloring;
 mod graph_coloring_draw;
 mod graph_coloring_comp;
 mod diagnostics;
+mod firewall_graph;
 
 use dotenv::dotenv;
 use std::env;

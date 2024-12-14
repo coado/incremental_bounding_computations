@@ -6,3 +6,4 @@ mod tsp_draw;
 mod tsp_comp;
 mod graph_coloring_comp;
 mod diagnostics;
+mod firewall_graph; 
