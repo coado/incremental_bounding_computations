@@ -26,6 +26,7 @@ pub struct GraphColoring {
     comp: Option<GraphColoringComp>
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ScoreCalcTypeGraphColoring {
     Fast,
     Slow,
@@ -33,18 +34,22 @@ pub enum ScoreCalcTypeGraphColoring {
 }
 
 impl GraphColoring {
-    pub fn new(graph: Rc<Graph>, score_type: ScoreCalcTypeGraphColoring) -> GraphColoring {
+    pub fn new(graph: Rc<Graph>, score_type: ScoreCalcTypeGraphColoring, flags: Option<GraphColouringFlags>) -> GraphColoring {
         let number_of_nodes = graph.get_number_of_nodes() as i32;
         let coloring = (0..number_of_nodes)
             .map(|_| Color(0))
             .collect::<Vec<Color>>();
+
+        if score_type == ScoreCalcTypeGraphColoring::Incremental && flags.is_none() {
+            panic!("Incremental score calculation requires flags to be set");
+        }
 
         let comp = match &score_type {
             ScoreCalcTypeGraphColoring::Incremental => {
                 let mut comp = GraphColoringComp::new(
                     Rc::clone(&graph), 
                     number_of_nodes as usize, 
-                    GraphColouringFlags::new(true, true, true));
+                    flags.unwrap());
                 comp.create_computation_graph();
                 comp.get_result();
                 Some(comp)
@@ -233,7 +238,11 @@ mod tests {
     fn test_calculate_score_naive() {
         let graph = create_testing_graph();
         let graph_rc = Rc::new(graph);
-        let mut graph_coloring = GraphColoring::new(Rc::clone(&graph_rc), ScoreCalcTypeGraphColoring::Fast);
+        let mut graph_coloring = GraphColoring::new(
+            Rc::clone(&graph_rc), 
+            ScoreCalcTypeGraphColoring::Fast,
+            None
+        );
         let score = graph_coloring.calculate_score_naive();
         assert_eq!(score, 45, "Calucalte Score Naive: Score is incorrect, should be 45");
 
@@ -260,7 +269,11 @@ mod tests {
     fn test_calculate_score_slow() {
         let graph = create_testing_graph();
         let graph_rc = Rc::new(graph);
-        let mut graph_coloring = GraphColoring::new(Rc::clone(&graph_rc), ScoreCalcTypeGraphColoring::Slow);
+        let mut graph_coloring = GraphColoring::new(
+            Rc::clone(&graph_rc), 
+            ScoreCalcTypeGraphColoring::Slow,
+            None
+        );
         let score = graph_coloring.calculate_score_slow();
         assert_eq!(score, 45, "Calucalte Score Naive: Score is incorrect, should be 45");
 
@@ -287,7 +300,11 @@ mod tests {
     fn test_graph_coloring_fast() {
         let graph = create_testing_graph();
         let graph_rc = Rc::new(graph);
-        let mut graph_coloring = GraphColoring::new(Rc::clone(&graph_rc), ScoreCalcTypeGraphColoring::Fast);
+        let mut graph_coloring = GraphColoring::new(
+            Rc::clone(&graph_rc), 
+            ScoreCalcTypeGraphColoring::Fast, 
+            None
+        );
         let score  = graph_coloring.graph_coloring();
         let coloring = graph_coloring.coloring;
 
@@ -299,7 +316,11 @@ mod tests {
     fn test_graph_coloring_slow() {
         let graph = create_testing_graph();
         let graph_rc = Rc::new(graph);
-        let mut graph_coloring = GraphColoring::new(Rc::clone(&graph_rc), ScoreCalcTypeGraphColoring::Slow);
+        let mut graph_coloring = GraphColoring::new(
+            Rc::clone(&graph_rc),
+            ScoreCalcTypeGraphColoring::Slow,
+            None
+        );
         let score  = graph_coloring.graph_coloring();
         let coloring = graph_coloring.coloring;
 
@@ -311,7 +332,11 @@ mod tests {
     fn test_graph_coloring_incremental() {
         let graph = create_testing_graph();
         let graph_rc = Rc::new(graph);
-        let mut graph_coloring = GraphColoring::new(Rc::clone(&graph_rc), ScoreCalcTypeGraphColoring::Incremental);
+        let mut graph_coloring = GraphColoring::new(
+            Rc::clone(&graph_rc), 
+            ScoreCalcTypeGraphColoring::Incremental,
+            Some(GraphColouringFlags::default())
+        );
         let score  = graph_coloring.graph_coloring();
         let coloring = graph_coloring.coloring;
 
