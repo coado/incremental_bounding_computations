@@ -46,7 +46,7 @@ fn draw_path(draw: &Draw, boundary: &Rect, path: TspPath, model: &Model) {
 
 fn model(_app: &App) -> Model {
     let mut tsp_graph = Graph::new();
-    tsp_graph.fill_with_random_points(100);
+    tsp_graph.fill_with_random_points(200);
     tsp_graph.fill_with_edges_full();
 
     let tsp_graph = Rc::new(tsp_graph);
@@ -86,7 +86,7 @@ fn view(app: &App, model: &Model, frame: Frame) {
 
 pub fn draw() {    
     nannou::app(model)
-        .loop_mode(LoopMode::Rate { update_interval: Duration::from_millis(1000) })
+        .loop_mode(LoopMode::Rate { update_interval: Duration::from_millis(5000) })
         .update(update)
         .simple_window(view)
         .run();

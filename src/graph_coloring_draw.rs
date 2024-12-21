@@ -7,7 +7,7 @@ use nannou::prelude::*;
 
 use crate::graph::{Graph, Point};
 use crate::graph_coloring::{Color, GraphColoring, ScoreCalcTypeGraphColoring};
-use crate::graph_coloring_comp::GraphColouringFlags;
+use crate::graph_coloring_comp::GraphColoringFlags;
 
 struct Model {
     graph: Rc<Graph>,
@@ -63,14 +63,15 @@ fn draw_edges(draw: &Draw, boundary: &Rect, model: &Model) {
 
 fn model(_app: &App) -> Model {
     let mut graph = Graph::new();
-    graph.fill_with_random_points(10);
+    graph.fill_with_random_points(50);
     graph.fill_with_edges_stochastic(0.35);
 
     let graph = Rc::new(graph);
     let mut graph_coloring = GraphColoring::new(
         Rc::clone(&graph), 
-        ScoreCalcTypeGraphColoring::Incremental, 
-        Some(GraphColouringFlags::new(false, false, true))
+        ScoreCalcTypeGraphColoring::Fast, 
+        // Some(GraphColoringFlags::new(false, false, true))
+        None
     );
     let starting_coloring = graph_coloring.coloring.clone();
     graph_coloring.graph_coloring();

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use crate::graph::{Graph, PointId};
-use crate::graph_coloring_comp::{GraphColoringComp, GraphColouringFlags};
+use crate::graph_coloring_comp::{GraphColoringComp, GraphColoringFlags};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Color(pub i32);
@@ -34,7 +34,7 @@ pub enum ScoreCalcTypeGraphColoring {
 }
 
 impl GraphColoring {
-    pub fn new(graph: Rc<Graph>, score_type: ScoreCalcTypeGraphColoring, flags: Option<GraphColouringFlags>) -> GraphColoring {
+    pub fn new(graph: Rc<Graph>, score_type: ScoreCalcTypeGraphColoring, flags: Option<GraphColoringFlags>) -> GraphColoring {
         let number_of_nodes = graph.get_number_of_nodes() as i32;
         let coloring = (0..number_of_nodes)
             .map(|_| Color(0))
@@ -335,7 +335,7 @@ mod tests {
         let mut graph_coloring = GraphColoring::new(
             Rc::clone(&graph_rc), 
             ScoreCalcTypeGraphColoring::Incremental,
-            Some(GraphColouringFlags::default())
+            Some(GraphColoringFlags::default())
         );
         let score  = graph_coloring.graph_coloring();
         let coloring = graph_coloring.coloring;

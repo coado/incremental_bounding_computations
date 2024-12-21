@@ -6,7 +6,7 @@ use crate::diagnostics::Diagnostics;
 use crate::graph::Graph;
 
 #[derive(Debug, Default)]
-pub struct GraphColouringFlags {
+pub struct GraphColoringFlags {
     pub enable_firewall: bool,
     pub enable_dynamic_branches: bool,
     pub merge_computation_layers: bool,
@@ -27,17 +27,17 @@ impl Guards {
     }
 }
 
-impl GraphColouringFlags {
-    pub fn new(enable_firewall: bool, enable_dynamic_branches: bool, merge_computation_layers: bool) -> GraphColouringFlags {
-        GraphColouringFlags {
+impl GraphColoringFlags {
+    pub fn new(enable_firewall: bool, enable_dynamic_branches: bool, merge_computation_layers: bool) -> GraphColoringFlags {
+        GraphColoringFlags {
             enable_firewall,
             enable_dynamic_branches,
             merge_computation_layers
         }
     }
 
-    pub fn default() -> GraphColouringFlags {
-        GraphColouringFlags {
+    pub fn default() -> GraphColoringFlags {
+        GraphColoringFlags {
             enable_firewall: false,
             enable_dynamic_branches: false,
             merge_computation_layers: false
@@ -54,11 +54,11 @@ pub struct GraphColoringComp {
     used_colours: usize,
     diagnostics: Option<Diagnostics>,
     graph: Rc<Graph>,
-    flags: GraphColouringFlags
+    flags: GraphColoringFlags
 }
 
 impl GraphColoringComp {
-    pub fn new(graph: Rc<Graph>, n: usize, flags: GraphColouringFlags) -> GraphColoringComp {
+    pub fn new(graph: Rc<Graph>, n: usize, flags: GraphColoringFlags) -> GraphColoringComp {
         manage::init_dcg();
 
         if cfg!(feature = "traces") {
@@ -365,7 +365,7 @@ mod tests {
         unsafe { &*AL }
     }
 
-    fn make_result_tests(flags: GraphColouringFlags) -> GraphColoringComp {
+    fn make_result_tests(flags: GraphColoringFlags) -> GraphColoringComp {
         let mut graph = Graph::new();
         graph.add_nodes((0..4).map(|_| Point::random()).collect());
         graph.add_2d_edge(0, 2);
@@ -405,7 +405,7 @@ mod tests {
     #[test]
     fn test_guards_layer() {
         let n = 3;
-        let mut graph_coloring_comp = GraphColoringComp::new(Rc::new(Graph::default()), n, GraphColouringFlags::default());
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::new(Graph::default()), n, GraphColoringFlags::default());
         
         let guards_layer_zero: Guards = graph_coloring_comp.create_guards_layer(0);
         let guards_layer_one = graph_coloring_comp.create_guards_layer(1);
@@ -449,7 +449,7 @@ mod tests {
 
     #[test]
     fn test_diagnostics() {
-        let mut graph_coloring_comp = GraphColoringComp::new(Rc::new(Graph::default()), 3, GraphColouringFlags::default());
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::new(Graph::default()), 3, GraphColoringFlags::default());
         let guards_layer = graph_coloring_comp.create_guards_layer(0);
         assert!(guards_layer.len() == 3, "Guards layer should have 3 guards");
 
@@ -475,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_computation_graph_default_flags() {
-        let mut graph_coloring_comp = make_result_tests(GraphColouringFlags::default());
+        let mut graph_coloring_comp = make_result_tests(GraphColoringFlags::default());
 
         graph_coloring_comp.seal();
         if let Some(diag) = graph_coloring_comp.diagnostics {
@@ -493,7 +493,7 @@ mod tests {
 
     #[test]
     fn test_computation_graph_merge_layers_flag() {
-        let mut graph_coloring_comp = make_result_tests(GraphColouringFlags::new(false, false, true));
+        let mut graph_coloring_comp = make_result_tests(GraphColoringFlags::new(false, false, true));
 
         graph_coloring_comp.seal();
         if let Some(diag) = graph_coloring_comp.diagnostics {
@@ -509,7 +509,7 @@ mod tests {
 
     #[test]
     fn test_computation_graph_dynamic_branches_flag() {
-        let mut graph_coloring_comp = make_result_tests(GraphColouringFlags::new(false, true, false));
+        let mut graph_coloring_comp = make_result_tests(GraphColoringFlags::new(false, true, false));
 
         graph_coloring_comp.seal();
         if let Some(diag) = graph_coloring_comp.diagnostics {
@@ -530,27 +530,27 @@ mod tests {
 
     #[test]
     fn test_computation_graph_enable_firewall_flag() {
-        make_result_tests(GraphColouringFlags::new(true, false, false));
+        make_result_tests(GraphColoringFlags::new(true, false, false));
     }
 
     #[test]
     fn test_computation_graph_enable_firewall_and_dynamic_branches_flag() {
-        make_result_tests(GraphColouringFlags::new(true, true, false));
+        make_result_tests(GraphColoringFlags::new(true, true, false));
     }
 
     #[test]
     fn test_computation_graph_enable_firewall_and_merge_computations_flag() {
-        make_result_tests(GraphColouringFlags::new(true, false, true));
+        make_result_tests(GraphColoringFlags::new(true, false, true));
     }
 
     #[test]
     fn test_computation_graph_enable_dynamic_branches_and_merge_computations_flag() {
-        make_result_tests(GraphColouringFlags::new(false, true, true));
+        make_result_tests(GraphColoringFlags::new(false, true, true));
     }
 
     #[test]
     fn test_computation_graph_enable_all_flags() {
-        make_result_tests(GraphColouringFlags::new(true, true, true));
+        make_result_tests(GraphColoringFlags::new(true, true, true));
     }
 
     #[test]
@@ -563,7 +563,7 @@ mod tests {
         graph.add_2d_edge(1, 3);
 
         let graph_rc = Rc::new(graph);
-        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 4, GraphColouringFlags::default());
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 4, GraphColoringFlags::default());
         
         let guards_layer_zero = graph_coloring_comp.create_guards_layer(0);
         let guards_layer_one = graph_coloring_comp.create_guards_layer(1);
@@ -621,7 +621,7 @@ mod tests {
         graph.add_2d_edge(3, 4);
 
         let graph_rc = Rc::new(graph);
-        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 5, GraphColouringFlags::default());
+        let mut graph_coloring_comp = GraphColoringComp::new(Rc::clone(&graph_rc), 5, GraphColoringFlags::default());
         graph_coloring_comp.create_computation_graph();
         let result = graph_coloring_comp.get_result();
 
