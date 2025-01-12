@@ -1,7 +1,21 @@
 
 # Incremental Calculation of the Objective Function in Local Search Algorithms
 
-<img width="753" alt="graph-coloring-comp-1" src="https://github.com/user-attachments/assets/5c2f4a8f-e0fb-4a52-8605-aec90bbeffa3" />
+
+<p align="center" width="100%">
+  <img src="https://github.com/user-attachments/assets/ab1a9070-6544-49fe-87e9-5beeae1824d9" alt="Computation Graph 1" title="Computation Graph 1" width="50%" />
+</p>
+<p align="center" width="100%">
+<em>Figure 1: Computation Graph for Initial State</em>
+</p>
+
+<p align="center" width="100%">
+  <img src="https://github.com/user-attachments/assets/d8ed063b-f362-4c27-942c-a7f11674ef89" alt="Computation Graph 1" title="Computation Graph 1" width="50%" />
+</p>
+
+<p align="center" width="100%">
+<em>Figure 2: Computation Graph after the change in the input vertex "a" presenting the propagation of the dirty state</em>
+</p>
 
 
 ## Abstract
